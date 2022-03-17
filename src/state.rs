@@ -1,53 +1,57 @@
 #![allow(unused)]
+use std::hash::Hasher;
+
 use bytes;
-use chrono;
 use linked_hash_map;
+
+use crate::global::Time;
 
 const DEFAULT_STATE_SHARD_CAPACITY: usize = 20;
 const MAX_STATE_SHARD_CAPACITY: usize = 100;
 
-type StateData =
-std::sync::Arc<Vec<std::sync::Mutex<linked_hash_map::LinkedHashMap<String, bytes::Bytes>>>>;
+type StateData = std::sync::Arc<
+    Vec<
+        std::sync::Mutex<
+            linked_hash_map::LinkedHashMap<String, std::sync::Arc<std::sync::Mutex<bytes::Bytes>>>,
+        >,
+    >,
+>;
+
+struct Status {
+    expires: Option<Time>,
+}
 
 struct State {
     current: StateData,
+    status: Status,
 }
 impl State {
-    pub fn new() -> State {
-        State {
-            current: std::sync::Arc::new(Vec::new()),
-        }
+    pub fn get(self, key: &str) -> Option<bytes::Bytes> {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        std::ptr::hash(key, &mut hasher);
+
+        let mut shard = self.current
+            [usize::try_from(hasher.finish()).unwrap() % self.current.len()]
+        .lock()
+        .unwrap();
+
+        let data = match shard.get(key).unwrap().lock().unwrap() {
+            val => Some(val.clone()),
+            _ => None,
+        };
+        data
     }
 
-    pub fn capacity(self, num_shards: usize) -> State {
-        match num_shards > self.current.len() {
-            true => {
-                match num_shards < MAX_STATE_SHARD_CAPACITY {
-                    true => {
-                        let mut v = Vec::with_capacity(num_shards);
+    pub fn new(capacity: usize) -> State {
+        let mut v = Vec::with_capacity(capacity);
 
-                        for item in &*self.current {
-                            v.push(std::sync::Mutex::new(item.lock().unwrap().clone()))
-                        }
+        for _ in 0..capacity {
+            v.push(std::sync::Mutex::new(linked_hash_map::LinkedHashMap::new()));
+        }
 
-                        for _ in v.len() - 1..num_shards {
-                            v.push(std::sync::Mutex::new(linked_hash_map::LinkedHashMap::new()));
-                        }
-
-                        State {
-                            current: std::sync::Arc::new(v),
-                        }
-                    },
-                    false => {
-                        println!("Unable to change state capacity, value must be smaller than {}", MAX_STATE_SHARD_CAPACITY);
-                        self
-                    }
-                }
-            }
-            false => {
-                println!("Unable to change state capacity, value must be larger than current size");
-                self
-            }
+        State {
+            current: std::sync::Arc::new(v),
+            status: Status { expires: None },
         }
     }
 }
