@@ -4,8 +4,7 @@ use chrono;
 
 pub struct Encryption;
 impl Encryption {
-    pub fn hash(key: String) -> u64 {
-        let key = &key[..];
+    pub fn hash(key: &str) -> u64 {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         std::ptr::hash(key, &mut hasher);
         hasher.finish()
