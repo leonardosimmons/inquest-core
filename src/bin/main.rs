@@ -14,6 +14,7 @@ async fn main() {
     match system_state.get("Hello") {
         StateResponse::Data(data) => println!("get Value: {:?}", data),
         StateResponse::NotFound => println!("Key not found"),
-        _ => println!("Unexpected error has occurred"),
+        StateResponse::Error(err) => println!("{}", err.msg),
+        _ => {}
     };
 }

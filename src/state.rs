@@ -23,6 +23,30 @@ pub struct State {
     state: DataMatrix,
 }
 impl State {
+    pub fn back(&mut self, key: &str) -> StateResponse {
+        let mut shard = self.get_shard(key);
+        if let Some((_, data)) = shard.back() {
+            StateResponse::Data(data.clone())
+        } else {
+            StateResponse::Error(Error {
+                msg: String::from("Unable to retrieve last element"),
+                timestamp: chrono::Utc::now()
+            })
+        }
+    }
+
+    pub fn front(&mut self, key: &str) -> StateResponse {
+        let mut shard = self.get_shard(key);
+        if let Some((_, data)) = shard.front() {
+            StateResponse::Data(data.clone())
+        } else {
+            StateResponse::Error(Error {
+                msg: String::from("Unable to retrieve first element"),
+                timestamp: chrono::Utc::now()
+            })
+        }
+    }
+
     pub fn get(&self, key: &str) -> StateResponse {
         let mut shard = self.get_shard(key.clone());
         match shard.get(key) {
@@ -56,6 +80,28 @@ impl State {
 
         State {
             state: std::sync::Arc::new(v),
+        }
+    }
+
+    pub fn pop_back(&mut self, key: &str) -> StateResponse {
+        let mut shard = self.get_shard(key);
+        match shard.pop_back() {
+            Some((_, data)) => StateResponse::Data(data),
+            None => StateResponse::Error(Error {
+                msg: String::from("Unable to remove last element"),
+                timestamp: chrono::Utc::now()
+            })
+        }
+    }
+
+    pub fn pop_front(&mut self, key: &str) -> StateResponse {
+        let mut shard = self.get_shard(key);
+        match shard.pop_front() {
+            Some((_, data)) => StateResponse::Data(data),
+            None => StateResponse::Error(Error {
+                msg: String::from("Unable to remove first element"),
+                timestamp: chrono::Utc::now()
+            })
         }
     }
 
