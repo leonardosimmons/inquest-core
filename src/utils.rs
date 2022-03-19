@@ -2,13 +2,14 @@ use std::hash::Hasher;
 
 use chrono;
 
-pub struct Encryption;
-impl Encryption {
-    pub fn hash(key: &str) -> u64 {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        std::ptr::hash(key, &mut hasher);
-        hasher.finish()
-    }
+pub trait Encryption {
+    fn hash(key: &str) -> u64;
 }
 
-pub type Time = chrono::DateTime<chrono::Utc>;
+pub struct Error {
+    pub msg: String,
+    pub timestamp: DateTime
+}
+
+
+pub type DateTime = chrono::DateTime<chrono::Utc>;
