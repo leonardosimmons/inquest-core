@@ -65,7 +65,7 @@ impl State {
             Some(val) => StateResponse::Data(val),
             None => StateResponse::NotFound,
             _ => StateResponse::Error(Error {
-                msg: String::from("key not found"),
+                msg: String::from(DEFAULT_STATE_ERROR_MSG),
                 timestamp: chrono::Utc::now(),
             }),
         }
