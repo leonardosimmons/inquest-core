@@ -1,22 +1,24 @@
 #![allow(unused)]
 use std::hash::Hasher;
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use bytes;
-use linked_hash_map;
+use bytes::Bytes;
+use chrono::Utc;
+use linked_hash_map::LinkedHashMap;
 
 use crate::utils::{Encryption, Error};
 
 const DEFAULT_STATE_ERROR_MSG: &str = "Unexpected error has occurred";
 
 pub enum StateResponse {
-    Data(bytes::Bytes),
+    Data(Bytes),
     Error(Error),
     NotFound,
     Ok,
 }
 
-type DataArray = linked_hash_map::LinkedHashMap<String, bytes::Bytes>;
-type DataMatrix = std::sync::Arc<Vec<std::sync::Mutex<DataArray>>>;
+type DataArray = LinkedHashMap<String, Bytes>;
+type DataMatrix = Arc<Vec<Mutex<DataArray>>>;
 
 #[derive(Clone)]
 pub struct State {
@@ -30,7 +32,7 @@ impl State {
         } else {
             StateResponse::Error(Error {
                 msg: String::from("Unable to retrieve last element"),
-                timestamp: chrono::Utc::now()
+                timestamp: Utc::now()
             })
         }
     }
@@ -42,7 +44,7 @@ impl State {
         } else {
             StateResponse::Error(Error {
                 msg: String::from("Unable to retrieve first element"),
-                timestamp: chrono::Utc::now()
+                timestamp: Utc::now()
             })
         }
     }
@@ -54,19 +56,19 @@ impl State {
             None => StateResponse::NotFound,
             _ => StateResponse::Error(Error {
                 msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: chrono::Utc::now(),
+                timestamp: Utc::now(),
             }),
         }
     }
 
-    pub fn insert(&self, key: &str, data: bytes::Bytes) -> StateResponse {
+    pub fn insert(&self, key: &str, data: Bytes) -> StateResponse {
         let mut shard = self.get_shard(key.clone());
         match shard.insert(key.to_string(), data.clone()) {
             Some(val) => StateResponse::Data(val),
             None => StateResponse::Ok,
             _ => StateResponse::Error(Error {
                 msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: chrono::Utc::now(),
+                timestamp: Utc::now(),
             }),
         }
     }
@@ -75,11 +77,11 @@ impl State {
         let mut v = Vec::with_capacity(capacity);
 
         for _ in 0..capacity {
-            v.push(std::sync::Mutex::new(linked_hash_map::LinkedHashMap::new()));
+            v.push(Mutex::new(LinkedHashMap::new()));
         }
 
         State {
-            state: std::sync::Arc::new(v),
+            state: Arc::new(v),
         }
     }
 
@@ -89,7 +91,7 @@ impl State {
             Some((_, data)) => StateResponse::Data(data),
             None => StateResponse::Error(Error {
                 msg: String::from("Unable to remove last element"),
-                timestamp: chrono::Utc::now()
+                timestamp: Utc::now()
             })
         }
     }
@@ -100,7 +102,7 @@ impl State {
             Some((_, data)) => StateResponse::Data(data),
             None => StateResponse::Error(Error {
                 msg: String::from("Unable to remove first element"),
-                timestamp: chrono::Utc::now()
+                timestamp: Utc::now()
             })
         }
     }
@@ -112,12 +114,12 @@ impl State {
             None => StateResponse::NotFound,
             _ => StateResponse::Error(Error {
                 msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: chrono::Utc::now(),
+                timestamp: Utc::now(),
             }),
         }
     }
 
-    fn get_shard(&self, key: &str) -> std::sync::MutexGuard<DataArray> {
+    fn get_shard(&self, key: &str) -> MutexGuard<DataArray> {
         let mut hash = State::hash(key);
         self.state[usize::try_from(hash).unwrap() % self.state.len()]
             .lock()
