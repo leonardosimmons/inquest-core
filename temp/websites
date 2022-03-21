@@ -1,0 +1,2 @@
+book catalog: http://books.toscrape.com/catalogue/page-{}.html
+hacker news:  https://news.ycombinator.com
