@@ -1,20 +1,22 @@
+use std::str;
+
 use bytes::Bytes;
 use select::document::Document;
 use select::predicate::{Name, Predicate};
 
 pub struct Html {
-    text: String,
+    html: Bytes,
 }
 impl Html {
     pub fn new(html: String) -> Html {
-        Html { text: html }
+        Html { html: html.into() }
     }
 
     pub async fn from_url(url: &str) -> Result<Html, ParseError> {
         match reqwest::get(url).await {
             Ok(resp) => {
                 if let Ok(text) = resp.text().await {
-                    Ok(Html { text })
+                    Ok(Html::new(text))
                 } else {
                     Err(ParseError::Failed(String::from(
                         "failed to parse html from response",
@@ -30,15 +32,15 @@ impl Html {
     }
 
     pub fn bytes(&self) -> Bytes {
-        self.text.clone().into()
+        self.html.clone()
     }
 
     pub async fn document(&self) -> Document {
-        Document::from_read(&*Bytes::from(self.text.clone())).unwrap_or_else(|_| Document::from(""))
+        Document::from_read(&*self.html.clone()).unwrap_or_else(|_| Document::from(""))
     }
 
     pub fn text(&self) -> String {
-        self.text.clone()
+        str::from_utf8(&*self.html).unwrap().to_string()
     }
 }
 
