@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod parse {
-    use inquest::parse::Parse;
+    use inquest::parse::{Html, Parse};
     use tokio::fs::File;
     use tokio::io::AsyncReadExt;
 
@@ -10,7 +10,8 @@ mod parse {
         let mut file = File::open("./temp/test.html").await.unwrap();
         file.read_to_string(&mut buffer).await.unwrap();
 
-        let parse = Parse::new(buffer);
+        let html = Html::new(buffer);
+        let parse = Parse::new(html);
         let links = parse.all_links().await;
 
         assert_eq!(vec!["h2-link", "psub-a1-link", "psub-a2-link"], links);
@@ -23,6 +24,7 @@ mod state {
 
     #[test]
     fn data_retrieval() {
+        use std::str;
 
         let state = State::new(10);
         let copy = state.clone();
@@ -31,9 +33,9 @@ mod state {
 
         let resp = match state.get("Hello") {
             StateResponse::Data(data) => data,
-            _ => bytes::Bytes::from("")
+            _ => "".into()
         };
 
-        assert_eq!(bytes::Bytes::from("World"), resp);
+        assert_eq!("World", str::from_utf8(&*resp).unwrap());
     }
 }
