@@ -35,12 +35,24 @@ impl Html {
         self.html.clone()
     }
 
-    pub async fn document(&self) -> Document {
-        Document::from_read(&*self.html.clone()).unwrap_or_else(|_| Document::from(""))
+    pub async fn document(&self) -> Result<Document, ParseError> {
+        if let Ok(document) = Document::from_read(&*self.html) {
+            Ok(document)
+        } else {
+            Err(ParseError::Failed(String::from(
+                "unable to parse html into document",
+            )))
+        }
     }
 
-    pub fn text(&self) -> String {
-        str::from_utf8(&*self.html).unwrap().to_string()
+    pub fn text(&self) -> Result<String, ParseError> {
+        if let Ok(str) = str::from_utf8(&*self.html) {
+            Ok(String::from(str))
+        } else {
+            Err(ParseError::Failed(String::from(
+                "unable to parse text from html",
+            )))
+        }
     }
 }
 
@@ -61,12 +73,20 @@ impl<P> Parse<P> {
 }
 
 impl Parse<Html> {
-    pub async fn all_links(&self) -> Vec<String> {
-        Parse::link(self.parse.document().await, Name("a"))
+    pub async fn all_links(&self) -> Option<Vec<String>> {
+        if let Ok(document) = self.parse.document().await {
+            Some(Parse::link(document, Name("a")))
+        } else {
+            None
+        }
     }
 
-    pub async fn links<P: Predicate>(&self, predicate: P) -> Vec<String> {
-        Parse::link(self.parse.document().await, predicate)
+    pub async fn links<P: Predicate>(&self, predicate: P) -> Option<Vec<String>> {
+        if let Ok(document) = self.parse.document().await {
+            Some(Parse::link(document, predicate))
+        } else {
+            None
+        }
     }
 }
 impl LinkController for Parse<Html> {
