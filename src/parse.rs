@@ -1,9 +1,6 @@
-#![allow(unused)]
-use std::sync::{Arc, Mutex};
-
 use bytes::Bytes;
 use select::document::Document;
-use select::predicate::Name;
+use select::predicate::{Name, Predicate};
 
 pub struct Html {
     text: String,
@@ -13,16 +10,35 @@ impl Html {
         Html { text: html }
     }
 
-    pub fn text(&self) -> String {
-        self.text.clone()
+    pub async fn from_url(url: &str) -> Result<Html, ParseError> {
+        match reqwest::get(url).await {
+            Ok(resp) => {
+                if let Ok(text) = resp.text().await {
+                    Ok(Html { text })
+                } else {
+                    Err(ParseError::Failed(String::from(
+                        "failed to parse html from response",
+                    )))
+                }
+            }
+            Err(err) => Err(ParseError::Other(format!(
+                "unable to retrieve url {}: {}",
+                url,
+                err.to_string()
+            ))),
+        }
     }
 
     pub fn bytes(&self) -> Bytes {
         self.text.clone().into()
     }
 
-    pub fn set(&mut self, document: String) {
-        self.text = document;
+    pub async fn document(&self) -> Document {
+        Document::from_read(&*Bytes::from(self.text.clone())).unwrap_or_else(|_| Document::from(""))
+    }
+
+    pub fn text(&self) -> String {
+        self.text.clone()
     }
 }
 
@@ -33,48 +49,48 @@ pub enum ParseError {
     Other(String),
 }
 
-pub struct Parse {
-    bytes: Bytes,
+pub struct Parse<P> {
+    parse: P,
 }
-impl Parse {
-    pub fn new(string: String) -> Parse {
-        Parse {
-            bytes: string.into(),
-        }
+impl<P> Parse<P> {
+    pub fn new(kind: P) -> Parse<P> {
+        Parse { parse: kind }
     }
+}
 
-    pub async fn html_from_url(url: &str) -> Result<Html, ParseError> {
-        match reqwest::get(url).await {
-            Ok(resp) => {
-                if let Ok(text) = resp.text().await {
-                    Ok(Html { text })
-                } else {
-                    Err(ParseError::Failed(format!(
-                        "failed to parse html from response"
-                    )))
-                }
-            }
-            Err(err) => Err(ParseError::Other(format!(
-                "unable to retrieve url: {}",
-                url
-            ))),
-        }
-    }
-
+impl Parse<Html> {
     pub async fn all_links(&self) -> Vec<String> {
-        Document::from_read(&*self.bytes)
-            .unwrap_or_else(|_| Document::from(""))
-            .find(Name("a"))
+        Parse::link(self.parse.document().await, Name("a"))
+    }
+
+    pub async fn links<P: Predicate>(&self, predicate: P) -> Vec<String> {
+        Parse::link(self.parse.document().await, predicate)
+    }
+}
+impl LinkController for Parse<Html> {
+    fn link<P: Predicate>(document: Document, predicate: P) -> Vec<String> {
+        document
+            .find(predicate)
             .filter_map(|n| {
-                Some(
-                    n.attr("href")
-                        .unwrap()
-                        .trim_start_matches("http")
-                        .trim_start_matches("s")
-                        .trim_start_matches("://")
-                )
+                if let Some(link) = n.attr("href") {
+                    Some(Parse::fix_link(link))
+                } else {
+                    None
+                }
             })
             .map(|link| link.to_string())
-            .collect::<Vec<String>>()
+            .collect()
     }
+
+    fn fix_link(link: &str) -> &str {
+        link.trim_start_matches("https")
+            .trim_start_matches("http")
+            .trim_start_matches("://")
+            .trim_end_matches('/')
+    }
+}
+
+pub trait LinkController {
+    fn link<P: Predicate>(document: Document, predicate: P) -> Vec<String>;
+    fn fix_link(link: &str) -> &str;
 }
