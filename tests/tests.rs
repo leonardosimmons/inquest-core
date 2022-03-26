@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod parse {
-    use inquest::parse::{Html, Parse};
+    use inquest::html::Html;
+    use inquest::parse::Parse;
     use tokio::fs::File;
     use tokio::io::AsyncReadExt;
 
