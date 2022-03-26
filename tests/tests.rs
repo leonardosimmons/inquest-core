@@ -12,7 +12,7 @@ mod parse {
 
         let html = Html::new(buffer);
         let parse = Parse::new(html);
-        let links = parse.all_links().await;
+        let links = parse.all_links().await.unwrap();
 
         assert_eq!(vec!["h2-link", "psub-a1-link", "psub-a2-link"], links);
     }
