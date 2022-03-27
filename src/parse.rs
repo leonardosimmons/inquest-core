@@ -1,5 +1,6 @@
 use select::document::Document;
 use select::predicate::{Name, Predicate};
+use std::sync::{Arc, Mutex};
 
 use crate::html::{Headers, Html, HtmlTag};
 
@@ -11,11 +12,13 @@ pub enum ParseError {
 }
 
 pub struct Parse<P> {
-    parse: P,
+    parse: Arc<Mutex<P>>,
 }
 impl<P> Parse<P> {
     pub fn new(kind: P) -> Parse<P> {
-        Parse { parse: kind }
+        Parse {
+            parse: Arc::new(Mutex::new(kind)),
+        }
     }
 }
 
@@ -43,7 +46,7 @@ impl Parse<Html> {
         document
             .find(Name(&header[..]))
             .filter_map(|n| Some(n.text()))
-            .collect::<Vec<String>>()
+            .collect()
     }
 
     fn link<P: Predicate>(document: &Document, predicate: P) -> Vec<String> {
@@ -60,15 +63,12 @@ impl Parse<Html> {
             .collect()
     }
 
-    pub async fn all_links(&self) -> Result<Vec<String>, ParseError> {
-        match self.parse.document().await {
-            Ok(doc) => Ok(Parse::link(&doc, Name("a"))),
-            Err(err) => Err(err),
-        }
+    fn title(document: &Document) -> Vec<String> {
+        document.find(Name("title")).map(|t| t.text()).collect()
     }
 
     pub async fn all_headers(&self) -> Result<Vec<Headers>, ParseError> {
-        match self.parse.document().await {
+        match self.parse.lock().unwrap().document().await {
             Ok(doc) => {
                 let mut buffer: Vec<_> = vec![];
                 for i in 1..=6 {
@@ -80,8 +80,15 @@ impl Parse<Html> {
         }
     }
 
+    pub async fn all_links(&self) -> Result<Vec<String>, ParseError> {
+        Ok(Parse::link(
+            &self.parse.lock().unwrap().document().await?,
+            Name("a"),
+        ))
+    }
+
     pub async fn headers(&self, header: HtmlTag) -> Result<Headers, ParseError> {
-        match self.parse.document().await {
+        match self.parse.lock().unwrap().document().await {
             Ok(doc) => match header {
                 HtmlTag::H1 => Ok(Parse::header(1, Parse::header_tag(&doc, format!("h{}", 1)))),
                 HtmlTag::H2 => Ok(Parse::header(2, Parse::header_tag(&doc, format!("h{}", 2)))),
@@ -96,9 +103,13 @@ impl Parse<Html> {
     }
 
     pub async fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>, ParseError> {
-        match self.parse.document().await {
-            Ok(doc) => Ok(Parse::link(&doc, predicate)),
-            Err(err) => Err(err),
-        }
+        Ok(Parse::link(
+            &self.parse.lock().unwrap().document().await?,
+            predicate,
+        ))
+    }
+
+    pub async fn page_title(&self) -> Result<Vec<String>, ParseError> {
+        Ok(Parse::title(&self.parse.lock().unwrap().document().await?))
     }
 }
