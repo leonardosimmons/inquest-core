@@ -5,13 +5,27 @@ use select::document::Document;
 
 use crate::parse::ParseError;
 
-pub enum HeaderTag {
+pub enum HtmlTag {
+    A,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+    Body,
+    Footer,
+    Main
+}
+
+pub enum Headers {
     H1(Vec<String>),
     H2(Vec<String>),
     H3(Vec<String>),
     H4(Vec<String>),
     H5(Vec<String>),
     H6(Vec<String>),
+    Invalid
 }
 
 pub struct Html {
