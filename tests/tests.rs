@@ -1,21 +1,39 @@
 #[cfg(test)]
 mod parse {
-    use inquest::html::Html;
+    use inquest::html::{Headers, Html, HtmlTag};
     use inquest::parse::Parse;
-    use tokio::fs::File;
-    use tokio::io::AsyncReadExt;
 
-    #[tokio::test]
-    async fn all_links_check() {
+    async fn test_file() -> String {
+        use tokio::fs::File;
+        use tokio::io::AsyncReadExt;
+
         let mut buffer = String::new();
         let mut file = File::open("./temp/test.html").await.unwrap();
         file.read_to_string(&mut buffer).await.unwrap();
+        buffer
+    }
 
-        let html = Html::new(buffer);
+    #[tokio::test]
+    async fn all_links_check() {
+        let file = test_file().await;
+        let html = Html::new(file);
         let parse = Parse::new(html);
         let links = parse.all_links().await.unwrap();
 
         assert_eq!(vec!["h2-link", "psub-a1-link", "psub-a2-link"], links);
+    }
+
+    #[tokio::test]
+    async fn get_title_tags() {
+        let file = test_file().await;
+        let html = Html::new(file);
+        let parse = Parse::new(html);
+
+        let h1_header = match parse.headers(HtmlTag::H1).await.unwrap() {
+            Headers::H1(h) => h[0].clone(),
+            _ => String::from(""),
+        };
+        assert_eq!("Welcome To The Test HTML File", h1_header);
     }
 }
 
@@ -34,7 +52,7 @@ mod state {
 
         let resp = match state.get("Hello") {
             StateResponse::Data(data) => data,
-            _ => "".into()
+            _ => "".into(),
         };
 
         assert_eq!("World", str::from_utf8(&*resp).unwrap());
