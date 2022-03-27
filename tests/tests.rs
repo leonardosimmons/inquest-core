@@ -8,7 +8,7 @@ mod parse {
         use tokio::io::AsyncReadExt;
 
         let mut buffer = String::new();
-        let mut file = File::open("./temp/test.html").await.unwrap();
+        let mut file = File::open("tests/test.html").await.unwrap();
         file.read_to_string(&mut buffer).await.unwrap();
         buffer
     }

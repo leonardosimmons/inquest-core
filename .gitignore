@@ -8,4 +8,4 @@ Cargo.lock
 # custom
 .idea/
 /examples
-/temp
+/temp/
