@@ -29,7 +29,7 @@ pub enum Headers {
 }
 
 pub struct Html {
-    html: Bytes,
+    pub(crate) html: Bytes,
 }
 impl Html {
     pub fn new(html: String) -> Html {

@@ -20,6 +20,18 @@ impl<P> Parse<P> {
             parse: Arc::new(Mutex::new(kind)),
         }
     }
+
+    pub fn from(html: String) -> Parse<Html> {
+        Parse {
+            parse: Arc::new(Mutex::new(Html { html: html.into() })),
+        }
+    }
+
+    pub async fn from_url(html: &str) -> Parse<Html> {
+        Parse {
+            parse: Arc::new(Mutex::new(Html::from_url(&html[..]).await.unwrap())),
+        }
+    }
 }
 
 impl Parse<Html> {
@@ -30,7 +42,7 @@ impl Parse<Html> {
             .trim_end_matches('/')
     }
 
-    fn header(tag: u8, headers: Vec<String>) -> Headers {
+    fn header_from_tag(tag: u8, headers: Vec<String>) -> Headers {
         match tag {
             1 => Headers::H1(headers),
             2 => Headers::H2(headers),
@@ -40,6 +52,20 @@ impl Parse<Html> {
             6 => Headers::H6(headers),
             _ => Headers::Invalid,
         }
+    }
+
+    pub fn headers(headers: &Headers) -> Vec<String> {
+        let mut buffer = vec![];
+        match headers {
+            Headers::H1(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            Headers::H2(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            Headers::H3(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            Headers::H4(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            Headers::H5(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            Headers::H6(heads) => heads.iter().for_each(|h| buffer.push(h.clone())),
+            _ => {}
+        };
+        buffer
     }
 
     fn header_tag(document: &Document, header: String) -> Vec<String> {
@@ -72,7 +98,10 @@ impl Parse<Html> {
             Ok(doc) => {
                 let mut buffer: Vec<_> = vec![];
                 for i in 1..=6 {
-                    buffer.push(Parse::header(i, Parse::header_tag(&doc, format!("h{}", i))))
+                    buffer.push(Parse::header_from_tag(
+                        i,
+                        Parse::header_tag(&doc, format!("h{}", i)),
+                    ))
                 }
                 Ok(buffer)
             }
@@ -87,15 +116,33 @@ impl Parse<Html> {
         ))
     }
 
-    pub async fn headers(&self, header: HtmlTag) -> Result<Headers, ParseError> {
+    pub async fn header(&self, header: HtmlTag) -> Result<Headers, ParseError> {
         match self.parse.lock().unwrap().document().await {
             Ok(doc) => match header {
-                HtmlTag::H1 => Ok(Parse::header(1, Parse::header_tag(&doc, format!("h{}", 1)))),
-                HtmlTag::H2 => Ok(Parse::header(2, Parse::header_tag(&doc, format!("h{}", 2)))),
-                HtmlTag::H3 => Ok(Parse::header(3, Parse::header_tag(&doc, format!("h{}", 3)))),
-                HtmlTag::H4 => Ok(Parse::header(4, Parse::header_tag(&doc, format!("h{}", 4)))),
-                HtmlTag::H5 => Ok(Parse::header(5, Parse::header_tag(&doc, format!("h{}", 5)))),
-                HtmlTag::H6 => Ok(Parse::header(6, Parse::header_tag(&doc, format!("h{}", 6)))),
+                HtmlTag::H1 => Ok(Parse::header_from_tag(
+                    1,
+                    Parse::header_tag(&doc, format!("h{}", 1)),
+                )),
+                HtmlTag::H2 => Ok(Parse::header_from_tag(
+                    2,
+                    Parse::header_tag(&doc, format!("h{}", 2)),
+                )),
+                HtmlTag::H3 => Ok(Parse::header_from_tag(
+                    3,
+                    Parse::header_tag(&doc, format!("h{}", 3)),
+                )),
+                HtmlTag::H4 => Ok(Parse::header_from_tag(
+                    4,
+                    Parse::header_tag(&doc, format!("h{}", 4)),
+                )),
+                HtmlTag::H5 => Ok(Parse::header_from_tag(
+                    5,
+                    Parse::header_tag(&doc, format!("h{}", 5)),
+                )),
+                HtmlTag::H6 => Ok(Parse::header_from_tag(
+                    6,
+                    Parse::header_tag(&doc, format!("h{}", 6)),
+                )),
                 _ => Err(ParseError::Other(String::from("not a valid html `h` tag"))),
             },
             Err(err) => Err(err),

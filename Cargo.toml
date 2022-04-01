@@ -1,11 +1,13 @@
 [package]
 name = "inquest"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "An SEO Utility CLI tool"
 
 [dependencies]
 atoi = "1.0.0"
 chrono = "0.4"
+clap = { version = "3.1.6", features = ["derive"] }
 csv = "1.1"
 bytes = { version = "1", features = ["serde"] }
 linked-hash-map = "0.5.4"

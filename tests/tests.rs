@@ -16,7 +16,7 @@ mod parse {
     #[tokio::test]
     async fn get_headers() {
         let h1_header = match Parse::new(Html::new(test_file().await))
-            .headers(HtmlTag::H1)
+            .header(HtmlTag::H1)
             .await
             .unwrap()
         {
