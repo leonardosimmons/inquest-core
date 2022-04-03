@@ -1,7 +1,5 @@
 use clap::Parser;
 use std::path::PathBuf;
-use crate::html::Html;
-use crate::parse::Parse;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

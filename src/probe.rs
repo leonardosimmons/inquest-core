@@ -1,30 +1,28 @@
-use clap::Parser;
-use std::path::PathBuf;
 use crate::cli::Cli;
+use crate::error::{Error, ErrorKind};
 use crate::html::Html;
 use crate::parse::Parse;
+use crate::utils::Result;
 
-pub struct Probe{}
+pub struct Probe {}
 
 impl Probe {
-    pub async fn html(cli: &Cli, parse: Parse<Html>) -> Vec<String> {
+    pub async fn html(parse: Parse<Html>, cli: &Cli) -> Result<Vec<String>> {
         match &cli.search[..] {
-            "links" => parse.all_links().await.unwrap(),
-            "page title" => parse.page_title().await.unwrap(),
+            "links" => Ok(parse.all_links().await?),
+            "page_title" => Ok(parse.page_title().await?),
             "headers" => {
-                let mut headers = vec![];
-                parse
-                    .all_headers()
-                    .await
-                    .unwrap()
+                let mut headers = Vec::new();
+                parse.all_headers()
+                    .await?
                     .iter()
                     .for_each(|h| {
                         let vec = Parse::headers(h);
                         vec.iter().for_each(|i| headers.push(i.clone()))
                     });
-                headers
+                Ok(headers)
             },
-            _ => vec![],
+            _ => Err(Error::from(ErrorKind::InvalidSearch))
         }
     }
 }

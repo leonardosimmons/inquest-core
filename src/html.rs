@@ -1,81 +1,88 @@
-use std::str;
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
+use reqwest;
 use select::document::Document;
+use select::predicate::{Name, Predicate};
 
-use crate::parse::ParseError;
+use crate::error::{Error, ErrorKind};
+use crate::parse::Parse;
+use crate::utils::Result;
 
-pub enum HtmlTag {
-    A,
+pub(crate) enum HtmlTag {
     H1,
     H2,
     H3,
     H4,
     H5,
     H6,
-    Body,
-    Footer,
-    Main
 }
 
-pub enum Headers {
+pub(crate) enum Headers {
     H1(Vec<String>),
     H2(Vec<String>),
     H3(Vec<String>),
     H4(Vec<String>),
     H5(Vec<String>),
     H6(Vec<String>),
-    Invalid
+    Invalid,
 }
 
 pub struct Html {
-    pub(crate) html: Bytes,
+    pub(crate) html: Arc<Mutex<Bytes>>,
 }
+
 impl Html {
-    pub fn new(html: String) -> Html {
-        Html { html: html.into() }
+    pub(crate) fn new(document: String) -> Html {
+        Html {
+            html: Arc::new(Mutex::new(Bytes::from(document))),
+        }
     }
 
-    pub async fn from_url(url: &str) -> Result<Html, ParseError> {
+    pub(crate) async fn from_url(url: &str) -> Result<Html> {
         match reqwest::get(url).await {
             Ok(resp) => {
-                if let Ok(text) = resp.text().await {
-                    Ok(Html::new(text))
+                if let Ok(doc) = resp.text().await {
+                    Ok(Html::new(doc))
                 } else {
-                    Err(ParseError::Failed(String::from(
-                        "failed to parse html from response",
-                    )))
+                    Err(Error::from(ErrorKind::Html))
                 }
             }
-            Err(err) => Err(ParseError::Other(format!(
-                "unable to retrieve url {}: {}",
-                url,
-                err.to_string()
-            ))),
+            Err(_) => Err(Error::from(ErrorKind::Failed)),
         }
     }
 
-    pub fn bytes(&self) -> Bytes {
-        self.html.clone()
-    }
-
-    pub async fn document(&self) -> Result<Document, ParseError> {
-        if let Ok(document) = Document::from_read(&*self.html) {
-            Ok(document)
+    pub(crate) fn headers(&self, tag: &str) -> Result<Vec<String>> {
+        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+            Ok(doc.find(Name(tag)).filter_map(|n| Some(n.text())).collect())
         } else {
-            Err(ParseError::Failed(String::from(
-                "unable to parse html into document",
-            )))
+            Err(Error::from(ErrorKind::Html))
         }
     }
 
-    pub fn text(&self) -> Result<String, ParseError> {
-        if let Ok(str) = str::from_utf8(&*self.html) {
-            Ok(String::from(str))
+    pub(crate) fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
+        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+            Ok(doc
+                .find(predicate)
+                .filter_map(|n| {
+                    if let Some(link) = n.attr("href") {
+                        Some(Parse::fix_link(link))
+                    } else {
+                        None
+                    }
+                })
+                .map(|link| link.to_string())
+                .collect())
         } else {
-            Err(ParseError::Failed(String::from(
-                "unable to parse text from html",
-            )))
+            Err(Error::from(ErrorKind::Html))
+        }
+    }
+
+    pub(crate) fn title(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+            Ok(doc.find(Name("title")).map(|t| t.text()).collect())
+        } else {
+            Err(Error::from(ErrorKind::Html))
         }
     }
 }

@@ -7,29 +7,36 @@ use inquest::probe::Probe;
 async fn main() {
     let cli = Cli::new();
 
-    let result = match cli.path.capacity() == 0 {
+    let html = match cli.path.capacity() == 0 {
         true => {
-            let html = Parse::<Html>::from_url(&cli.url[..]).await;
-            Probe::html(&cli, html)
+            Parse::<Html>::from_url(&cli.url[..]).await.unwrap_or_else(|err| {
+                println!("{}", err.to_string());
+                Parse::from(String::from(""))
+            })
         }
         false => {
-            let file = get_file(cli.path.to_str().unwrap()).await;
-            let parse = Parse::<Html>::from(file.clone());
-
-            Probe::html(&cli, parse)
+            let file = get_file(cli.path.to_str().unwrap()).await.unwrap_or_else(|err| {
+                println!("{}", err.to_string());
+                String::new()
+            });
+            Parse::<Html>::from(file)
         }
-    }
-    .await;
+    };
+
+    let result = Probe::html(html, &cli).await.unwrap_or_else(|err| {
+        println!("{}", err.to_string());
+        Vec::new()
+    });
 
     println!("result: {:?}", result);
 }
 
-async fn get_file(path: &str) -> String {
+async fn get_file(path: &str) -> Result<String, std::io::Error> {
     use tokio::fs::File;
     use tokio::io::AsyncReadExt;
 
     let mut buffer = String::new();
-    let mut file = File::open(path).await.unwrap();
-    file.read_to_string(&mut buffer).await.unwrap();
-    buffer
+    let mut file = File::open(path).await?;
+    file.read_to_string(&mut buffer).await?;
+    Ok(buffer)
 }
