@@ -1,4 +1,3 @@
-#![allow(unused)]
 use std::hash::Hasher;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -6,9 +5,13 @@ use bytes::Bytes;
 use chrono::Utc;
 use linked_hash_map::LinkedHashMap;
 
-use crate::utils::{Encryption, Error};
+use crate::utils::{DateTime, Encryption};
 
-const DEFAULT_STATE_ERROR_MSG: &str = "Unexpected error has occurred";
+#[derive(Debug)]
+pub struct Error {
+    pub msg: String,
+    pub timestamp: DateTime,
+}
 
 pub enum StateResponse {
     Data(Bytes),
@@ -38,7 +41,7 @@ impl State {
     }
 
     pub fn front(&mut self, key: &str) -> StateResponse {
-        let mut shard = self.get_shard(key);
+        let shard = self.get_shard(key);
         if let Some((_, data)) = shard.front() {
             StateResponse::Data(data.clone())
         } else {
@@ -50,14 +53,10 @@ impl State {
     }
 
     pub fn get(&self, key: &str) -> StateResponse {
-        let mut shard = self.get_shard(key.clone());
+        let shard = self.get_shard(key.clone());
         match shard.get(key) {
             Some(val) => StateResponse::Data(val.clone()),
             None => StateResponse::NotFound,
-            _ => StateResponse::Error(Error {
-                msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: Utc::now(),
-            }),
         }
     }
 
@@ -66,10 +65,6 @@ impl State {
         match shard.insert(key.to_string(), data.clone()) {
             Some(val) => StateResponse::Data(val),
             None => StateResponse::Ok,
-            _ => StateResponse::Error(Error {
-                msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: Utc::now(),
-            }),
         }
     }
 
@@ -112,15 +107,11 @@ impl State {
         match shard.remove(key) {
             Some(val) => StateResponse::Data(val),
             None => StateResponse::NotFound,
-            _ => StateResponse::Error(Error {
-                msg: String::from(DEFAULT_STATE_ERROR_MSG),
-                timestamp: Utc::now(),
-            }),
         }
     }
 
     fn get_shard(&self, key: &str) -> MutexGuard<DataArray> {
-        let mut hash = State::hash(key);
+        let hash = State::hash(key);
         self.state[usize::try_from(hash).unwrap() % self.state.len()]
             .lock()
             .unwrap()

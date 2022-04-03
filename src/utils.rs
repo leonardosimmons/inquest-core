@@ -1,13 +1,11 @@
-use chrono;
+use std::result;
+
+use crate::error::Error;
 
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 
-pub trait Encryption {
+pub(crate) trait Encryption {
     fn hash(key: &str) -> u64;
 }
 
-#[derive(Debug)]
-pub struct Error {
-    pub msg: String,
-    pub timestamp: DateTime,
-}
+pub type Result<T> = result::Result<T, Error>;
