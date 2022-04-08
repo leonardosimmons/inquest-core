@@ -1,4 +1,7 @@
+#![allow(unused)]
 use inquest::cli::Cli;
+use inquest::cmd;
+use inquest::cmd::SystemCommand;
 use inquest::html::Html;
 use inquest::parse::Parse;
 use inquest::probe::Probe;
@@ -8,17 +11,30 @@ use inquest::utils::Result;
 async fn main() {
     let cli = Cli::new();
 
-    let _capacity = cli.path.capacity();
-
-    let task = tokio::spawn(async move {
-        process(cli).await.unwrap_or_else(|err| {
-            println!("{}", err.to_string());
-            Vec::new()
-        })
+    let _task = tokio::spawn(async move {
+        command(&cli)
     });
 
-    let result = task.await.unwrap();
-    println!("result: {:?}", result);
+    let parser = tokio::spawn(async move {});
+
+    let manager = tokio::spawn(async move {});
+
+    parser.await.unwrap();
+    manager.await.unwrap();
+}
+
+fn command(cli: &Cli) -> Result<SystemCommand> {
+    use cmd::html::HtmlCommand::*;
+    use cmd::parse::ParseCommand::*;
+
+    match cli.path.capacity() == 0 {
+        true => Ok(SystemCommand::Parse(Html {
+            cmd: Box::new(FromFile(cli.path.to_string_lossy().to_string())),
+        })),
+        false => Ok(SystemCommand::Parse(Html {
+            cmd: Box::new(FromUrl(cli.url.to_string())),
+        })),
+    }
 }
 
 async fn process(cli: Cli) -> Result<Vec<String>> {

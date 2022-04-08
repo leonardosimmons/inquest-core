@@ -16,6 +16,7 @@ pub enum HtmlTag {
     H4,
     H5,
     H6,
+    Invalid
 }
 
 pub enum Headers {
