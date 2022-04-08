@@ -9,7 +9,7 @@ use crate::error::{Error, ErrorKind};
 use crate::parse::Parse;
 use crate::utils::Result;
 
-pub(crate) enum HtmlTag {
+pub enum HtmlTag {
     H1,
     H2,
     H3,
@@ -18,7 +18,7 @@ pub(crate) enum HtmlTag {
     H6,
 }
 
-pub(crate) enum Headers {
+pub enum Headers {
     H1(Vec<String>),
     H2(Vec<String>),
     H3(Vec<String>),
@@ -33,9 +33,9 @@ pub struct Html {
 }
 
 impl Html {
-    pub(crate) fn new(document: String) -> Html {
+    pub(crate) fn new(document: impl ToString) -> Html {
         Html {
-            html: Arc::new(Mutex::new(Bytes::from(document))),
+            html: Arc::new(Mutex::new(Bytes::from(document.to_string()))),
         }
     }
 
@@ -43,7 +43,7 @@ impl Html {
         match reqwest::get(url).await {
             Ok(resp) => {
                 if let Ok(doc) = resp.text().await {
-                    Ok(Html::new(doc))
+                    Ok(Html::new(&doc))
                 } else {
                     Err(Error::from(ErrorKind::Html))
                 }
@@ -83,6 +83,14 @@ impl Html {
             Ok(doc.find(Name("title")).map(|t| t.text()).collect())
         } else {
             Err(Error::from(ErrorKind::Html))
+        }
+    }
+}
+
+impl Default for Html {
+    fn default() -> Self {
+        Self {
+            html: Arc::new(Mutex::new(Default::default()))
         }
     }
 }

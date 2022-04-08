@@ -7,7 +7,30 @@ use select::predicate::{Name, Predicate};
 
 use crate::error::{Error, ErrorKind};
 use crate::html::{Headers, Html, HtmlTag};
-use crate::utils::Result;
+use crate::utils::{Responder, Result};
+
+pub enum HtmlCommand {
+    AllHeaders,
+    AllLinks,
+    Bytes,
+    Document,
+    Description,
+    FixLink(&'static str),
+    FromText(&'static str),
+    FromUrl(&'static str),
+    Headers(Headers),
+    HeaderTag(HtmlTag),
+    Links(Box<dyn Predicate>),
+    PageTitle,
+    Text,
+}
+
+pub enum ParseCommand<T> {
+    Html {
+        cmd: Box<HtmlCommand>,
+        resp: Responder<T>
+    }
+}
 
 pub struct Parse<T> {
     parse: T,
@@ -20,10 +43,10 @@ impl<T> Parse<T> {
 }
 
 impl Parse<Html> {
-    pub fn from(document: String) -> Parse<Html> {
-        Parse {
+    pub fn from(document: impl ToString) -> Result<Parse<Html>> {
+        Ok(Parse {
             parse: Html::new(document),
-        }
+        })
     }
 
     pub async fn from_url(html: &str) -> Result<Parse<Html>> {

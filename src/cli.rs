@@ -1,20 +1,20 @@
-use clap::Parser;
 use std::path::PathBuf;
+use structopt::StructOpt;
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[derive(Debug, StructOpt)]
+#[structopt(name = "Inquest", about = "A SEO Utility Tool")]
 pub struct Cli {
     pub search: String,
 
-    #[clap(parse(from_os_str), default_value = "")]
+    #[structopt(parse(from_os_str), short, long, default_value = "")]
     pub path: PathBuf,
 
-    #[clap(short, long, default_value = "")]
+    #[structopt(short, long, default_value = "")]
     pub url: String,
 }
 impl Cli {
     pub fn new() -> Cli {
-        let cli = Cli::parse();
+        let cli = Cli::from_args();
         Cli {
             search: cli.search,
             path: cli.path,
