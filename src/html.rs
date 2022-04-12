@@ -16,7 +16,7 @@ pub enum HtmlTag {
     H4,
     H5,
     H6,
-    Invalid
+    Invalid,
 }
 
 pub enum Headers {
@@ -53,8 +53,34 @@ impl Html {
         }
     }
 
+    pub(crate) fn document(&self) -> std::result::Result<Document, std::io::Error> {
+        Document::from_read(&**self.html.lock().unwrap())
+    }
+
+    pub(crate) fn descriptions(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = self.document() {
+            Ok(doc
+                .find(Name("meta"))
+                .filter_map(|n| {
+                    match n.attr("name") {
+                        Some(name) => {
+                            if name.contains("description") {
+                                Some(name.to_string())
+                            } else {
+                                None
+                            }
+                        }
+                        None => None
+                    }
+                })
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Html))
+        }
+    }
+
     pub(crate) fn headers(&self, tag: &str) -> Result<Vec<String>> {
-        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+        if let Ok(doc) = self.document() {
             Ok(doc.find(Name(tag)).filter_map(|n| Some(n.text())).collect())
         } else {
             Err(Error::from(ErrorKind::Html))
@@ -62,7 +88,7 @@ impl Html {
     }
 
     pub(crate) fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
-        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+        if let Ok(doc) = self.document() {
             Ok(doc
                 .find(predicate)
                 .filter_map(|n| {
@@ -72,7 +98,7 @@ impl Html {
                         None
                     }
                 })
-                .map(|link| link.to_string())
+                .map(|x| x.to_string())
                 .collect())
         } else {
             Err(Error::from(ErrorKind::Html))
@@ -80,18 +106,10 @@ impl Html {
     }
 
     pub(crate) fn title(&self) -> Result<Vec<String>> {
-        if let Ok(doc) = Document::from_read(&**self.html.lock().unwrap()) {
+        if let Ok(doc) = self.document() {
             Ok(doc.find(Name("title")).map(|t| t.text()).collect())
         } else {
             Err(Error::from(ErrorKind::Html))
-        }
-    }
-}
-
-impl Default for Html {
-    fn default() -> Self {
-        Self {
-            html: Arc::new(Mutex::new(Default::default()))
         }
     }
 }
