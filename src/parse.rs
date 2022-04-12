@@ -1,4 +1,5 @@
 #![allow(unused)]
+use std::path::PathBuf;
 use std::str;
 
 use bytes::Bytes;
@@ -20,14 +21,22 @@ impl<T> Parse<T> {
 }
 
 impl Parse<Html> {
-    pub fn from(document: impl ToString) -> Result<Parse<Html>> {
+    pub(crate) fn from(document: impl ToString) -> Result<Parse<Html>> {
         Ok(Parse {
             parse: Html::new(document),
         })
     }
 
-    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
+    pub(crate) async fn from_url(html: &str) -> Result<Parse<Html>> {
         Ok(Parse::new(Html::from_url(html).await?))
+    }
+
+    pub(crate) fn path_to_string(paths: PathBuf) -> String {
+        paths
+            .to_str()
+            .unwrap_or_default()
+            .to_string()
+
     }
 
     pub(crate) fn bytes(&self) -> Bytes {

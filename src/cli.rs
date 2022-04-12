@@ -1,31 +1,71 @@
 #![allow(unused)]
+
+use std::borrow::Borrow;
 use std::path::PathBuf;
+
 use structopt::StructOpt;
+use crate::error::{Error, ErrorKind};
 
-use crate::cmd::parse::ParseCommand;
+use crate::utils::Result;
 
-#[derive(StructOpt)]
-#[structopt(name = "Inquest", about = "A SEO Utility Tool")]
+#[derive(StructOpt, Clone, Debug)]
+pub struct HtmlParseOpts {
+    #[structopt(short, long)]
+    /// Filter based on HTML tag
+    pub tags: Option<Vec<String>>,
+
+    #[structopt(parse(from_os_str), short, long)]
+    /// File paths to be probed
+    pub paths: Option<Vec<PathBuf>>,
+
+    #[structopt(short, long)]
+    /// Urls to be probed
+    pub urls: Option<Vec<String>>,
+}
+
+#[derive(StructOpt, Clone, Debug)]
+pub enum HtmlOpts {
+    #[structopt(name = "desc")]
+    /// Returns the meta description
+    Description(HtmlParseOpts),
+    #[structopt(name = "headers")]
+    /// Returns the specified headers
+    Headers(HtmlParseOpts),
+    #[structopt(name = "links")]
+    /// Returns the specified links
+    Links(HtmlParseOpts),
+    #[structopt(name = "title")]
+    /// Returns the title of the page
+    PageTitle(HtmlParseOpts),
+}
+
+#[derive(StructOpt, Clone, Debug)]
+pub enum CommandOpts {
+    #[structopt(name = "probe")]
+    /// Probes specified Html document
+    Probe(HtmlOpts),
+}
+
+#[derive(StructOpt, Debug)]
 pub struct Cli {
     #[structopt(subcommand)]
-    parser: ParseCommand,
-
-    pub search: String,
-
-    #[structopt(parse(from_os_str), short, long, default_value = "")]
-    pub path: PathBuf,
-
-    #[structopt(short, long, default_value = "")]
-    pub url: String,
+    /// System Command Options
+    cmd: Option<CommandOpts>,
 }
+
+
 impl Cli {
-    pub fn new() -> Cli {
-        let cli = Cli::from_args();
-        Cli {
-            parser: ParseCommand::Unknown,
-            search: cli.search,
-            path: cli.path,
-            url: cli.url
+    pub fn init() -> Cli {
+        Cli::from_args()
+    }
+
+    fn opts(&self) -> CommandOpts  {
+        self.cmd.clone().unwrap()
+    }
+
+    pub fn command(&self) -> HtmlOpts {
+        match self.opts() {
+            CommandOpts::Probe(opts) => opts,
         }
     }
 }

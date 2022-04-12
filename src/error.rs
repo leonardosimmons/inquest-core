@@ -1,4 +1,6 @@
 #![allow(unused)]
+
+#[derive(Debug)]
 pub enum ErrorType {
     Simple(ErrorKind),
     SimpleMessage(ErrorKind, &'static &'static str),
@@ -6,16 +8,22 @@ pub enum ErrorType {
 
 #[derive(Debug)]
 pub enum ErrorKind {
+    Create,
+    Delete,
     EndOfStream,
+    Failed,
     Html,
     InvalidData,
     InvalidHtmlTag,
     InvalidInput,
     InvalidParameters,
+    InvalidPath,
     InvalidSearch,
     InvalidUrl,
-    Failed,
+    InvalidUtf8,
+    NotFound,
     Parse,
+    Unimplemented,
     Unknown,
 }
 
@@ -24,21 +32,28 @@ impl ErrorKind {
         use ErrorKind::*;
 
         match *self {
+            Create => "unable to create",
+            Delete => "unable to delete",
             EndOfStream => "end of stream",
+            Failed => "failed",
             Html => "html error",
             InvalidData => "invalid data",
             InvalidHtmlTag => "invalid HTML tag",
             InvalidInput => "invalid input",
             InvalidParameters => "invalid parameters",
+            InvalidPath => "invalid path",
             InvalidSearch => "invalid search parameter",
             InvalidUrl => "invalid url",
-            Failed => "failed",
+            InvalidUtf8 => "invalid UTF-8",
+            NotFound => "not found",
             Parse => "parsing error",
+            Unimplemented => "unimplemented",
             Unknown => "unknown error has occurred",
         }
     }
 }
 
+#[derive(Debug)]
 pub struct Error {
     repr: ErrorType,
 }
