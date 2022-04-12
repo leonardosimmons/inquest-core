@@ -12,6 +12,7 @@ pub enum ErrorKind {
     Delete,
     EndOfStream,
     Failed,
+    FileNotFound,
     Html,
     InvalidData,
     InvalidHtmlTag,
@@ -36,6 +37,7 @@ impl ErrorKind {
             Delete => "unable to delete",
             EndOfStream => "end of stream",
             Failed => "failed",
+            FileNotFound => "file not found",
             Html => "html error",
             InvalidData => "invalid data",
             InvalidHtmlTag => "invalid HTML tag",
@@ -48,7 +50,7 @@ impl ErrorKind {
             NotFound => "not found",
             Parse => "parsing error",
             Unimplemented => "unimplemented",
-            Unknown => "unknown error has occurred",
+            Unknown => "unexpected error has occurred",
         }
     }
 }

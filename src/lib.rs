@@ -1,8 +1,5 @@
-pub mod cli;
 pub mod error;
 pub mod file;
-pub mod html;
-pub mod parse;
-pub mod probe;
-pub mod state;
-pub mod utils;
+pub(crate) mod html;
+pub(crate) mod parse;
+pub(crate) mod utils;
