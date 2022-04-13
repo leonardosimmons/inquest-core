@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use std::borrow::Borrow;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 use structopt::StructOpt;
@@ -53,19 +54,21 @@ pub struct Cli {
     cmd: Option<CommandOpts>,
 }
 
-
 impl Cli {
     pub fn init() -> Cli {
         Cli::from_args()
     }
 
-    fn opts(&self) -> CommandOpts  {
-        self.cmd.clone().unwrap()
-    }
-
-    pub fn command(&self) -> HtmlOpts {
-        match self.opts() {
+    pub fn command(&self) -> &HtmlOpts {
+        match self.deref().borrow() {
             CommandOpts::Probe(opts) => opts,
         }
+    }
+}
+impl Deref for Cli {
+    type Target = CommandOpts;
+
+    fn deref(&self) -> &Self::Target {
+        self.cmd.as_ref().unwrap()
     }
 }

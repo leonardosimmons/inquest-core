@@ -1,3 +1,6 @@
+#![allow(unused)]
+
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
@@ -26,7 +29,41 @@ pub enum Headers {
     H4(Vec<String>),
     H5(Vec<String>),
     H6(Vec<String>),
-    Invalid,
+    Invalid(Vec<String>),
+}
+impl Headers {
+    pub(crate) fn new(headers: Vec<String>, index: u8) -> Headers {
+        match index {
+            1 => Headers::H1(headers),
+            2 => Headers::H2(headers),
+            3 => Headers::H3(headers),
+            4 => Headers::H4(headers),
+            5 => Headers::H5(headers),
+            6 => Headers::H6(headers),
+            _ => Headers::Invalid(vec!["".to_string()]),
+        }
+    }
+}
+impl Deref for Headers {
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Headers::H1(heads) => heads,
+            Headers::H2(heads) => heads,
+            Headers::H3(heads) => heads,
+            Headers::H4(heads) => heads,
+            Headers::H5(heads) => heads,
+            Headers::H6(heads) => heads,
+            Headers::Invalid(heads) => heads
+        }
+    }
+}
+
+pub(crate) trait HtmlParser {
+    fn bytes(&self) -> Bytes;
+    fn document(&self) -> Result<Document>;
+    fn text(&self) -> Result<String>;
 }
 
 pub struct Html {
@@ -34,7 +71,7 @@ pub struct Html {
 }
 
 impl Html {
-    pub(crate) fn new(document: impl ToString) -> Html {
+    pub(crate) fn new(document: &str) -> Html {
         Html {
             html: Arc::new(Mutex::new(Bytes::from(document.to_string()))),
         }
@@ -54,7 +91,7 @@ impl Html {
     }
 
     pub(crate) fn document(&self) -> std::result::Result<Document, std::io::Error> {
-        Document::from_read(&**self.html.lock().unwrap())
+        Document::from_read(&**Arc::clone(&self.html).lock().unwrap())
     }
 
     pub(crate) fn descriptions(&self) -> Result<Vec<String>> {

@@ -1,3 +1,8 @@
+#![allow(unused)]
+use std::io::Bytes;
+use std::str;
+
+use bytes::BytesMut;
 use tokio::fs::File as TokioFile;
 use tokio::io::AsyncReadExt;
 
@@ -9,20 +14,17 @@ pub struct File {
 }
 
 impl File {
-    pub async fn new(path: &str) -> File {
+    pub async fn new(path: &str, mut buf: &[u8]) -> File {
         File {
-            text: File::from(path, String::new()).await.unwrap_or_else(|err| {
-                println!("{}", err.to_string());
-                String::new()
-            }),
+            text: File::from(path, buf).await.unwrap(),
         }
     }
 
-    pub async fn from(path: &str, mut buf: String) -> Result<String> {
+    pub async fn from(path: &str, mut buf: &[u8]) -> Result<String> {
         match TokioFile::open(path).await {
             Ok(mut f) => {
-                if let Ok(_) = f.read_to_string(&mut buf).await {
-                    Ok(buf)
+                if let Ok(_) = f.read_to_string(&mut str::from_utf8(buf).unwrap().to_string()).await {
+                    Ok(str::from_utf8(buf).unwrap().to_string())
                 } else {
                     Err(Error::from(ErrorKind::InvalidUtf8))
                 }
