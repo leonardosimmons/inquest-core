@@ -15,6 +15,8 @@ pub trait Parser {
     fn path_to_string(paths: PathBuf) -> String;
 }
 
+pub struct Base;
+
 pub struct Parse<T> {
     parse: T,
 }
@@ -23,11 +25,10 @@ impl<T> Parse<T> {
     pub fn new(kind: T) -> Parse<T> {
         Parse { parse: kind }
     }
-}
-
-impl<T> Parser for Parse<T> {
-    fn path_to_string(paths: PathBuf) -> String {
-        paths.to_str().unwrap_or_default().to_string()
+    
+    pub fn set(mut self, kind: T) -> Self { 
+        self.parse = kind;
+        self
     }
 }
 
@@ -52,6 +53,11 @@ impl<T> HtmlController for Parse<T>
     }
 }
 
+impl<T> Parser for Parse<T> {
+    fn path_to_string(paths: PathBuf) -> String {
+        paths.to_str().unwrap_or_default().to_string()
+    }
+}
 
 impl Parse<Html> {
     pub fn from(document: &str) -> Result<Parse<Html>> {
@@ -115,6 +121,14 @@ impl HtmlParser for Parse<Html> {
             Ok(text.to_owned())
         } else {
             Err(Error::from(ErrorKind::Html))
+        }
+    }
+}
+
+impl Default for Parse<Html> {
+    fn default() -> Self {
+        Parse {
+            parse: Html::new("")
         }
     }
 }

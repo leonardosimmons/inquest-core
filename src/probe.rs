@@ -1,44 +1,102 @@
 #![allow(unused)]
-
 use bytes::{Bytes, BytesMut};
 use std::path::PathBuf;
 
-use crate::file::File;
-use crate::html::{Html, HtmlParser};
-use crate::parse::{Parse, Parser};
-use crate::utils::{Result, Unknown};
 use crate::cli::Cli;
+use crate::file::File;
+use crate::html::{Html, HtmlController, HtmlParser};
+use crate::parse::{Base, Parse, Parser};
+use crate::utils::{Result, Unknown};
+
+const DEFAULT_PROBE_CAPACITY: usize = 4096;
+
+enum Origin {
+    Document,
+    Url,
+}
 
 pub trait Probe {}
 
-// pub struct DocumentProbe<Parser> {
-//     paths: Vec<PathBuf>,
-//     parse: Parser
-// }
-//
-// pub struct HttpProbe<T> {
-//     urls: Vec<String>,
-// }
-//
-// pub struct ProbeMain<Origin>
-//     where
-//         Origin: Probe,
-// {
-//     origin: Origin,
-//     capacity: Option<usize>,
-// }
-//
-// impl<Origin> ProbeMain<Origin> {
-//     pub fn new() -> ProbeMain<Unknown> {
-//         ProbeMain {
-//             origin: Unknown,
-//             capacity: None,
-//         }
-//     }
-// }
-//
-// impl<T> Probe for DocumentProbe<T> {}
-// impl<T> Probe for HttpProbe<T> {}
+pub struct Initialized {
+    capacity: usize,
+}
+
+pub struct DocumentProbe<Parser> {
+    capacity: usize,
+    paths: Vec<PathBuf>,
+    parse: Option<Parser>,
+}
+
+pub struct HttpProbe<Parser> {
+    capacity: usize,
+    urls: Vec<String>,
+    parse: Option<Parser>,
+}
+
+pub struct ProbeMain<S> {
+    state: S,
+}
+
+impl<S> ProbeMain<S> {
+    pub fn new() -> ProbeMain<Initialized> {
+        ProbeMain {
+            state: Initialized {
+                capacity: DEFAULT_PROBE_CAPACITY,
+            },
+        }
+    }
+}
+
+impl ProbeMain<Initialized> {
+    pub fn capacity(mut self, capacity: usize) -> Self {
+        self.state.capacity = capacity;
+        self
+    }
+
+    pub fn document<T>(self) -> ProbeMain<DocumentProbe<T>> {
+        ProbeMain {
+            state: DocumentProbe {
+                capacity: self.state.capacity,
+                paths: Vec::new(),
+                parse: None,
+            },
+        }
+    }
+
+    pub fn http<T>(self) -> ProbeMain<HttpProbe<T>> {
+        ProbeMain {
+            state: HttpProbe {
+                capacity: self.state.capacity,
+                urls: Vec::new(),
+                parse: None,
+            },
+        }
+    }
+}
+
+impl<Parser> Probe for DocumentProbe<Parser> {}
+
+impl<Parser> DocumentProbe<Parser>
+where
+    Parser: HtmlParser + HtmlController,
+{
+    pub async fn html(mut self, path: &str) -> DocumentProbe<Parse<Html>> {
+        DocumentProbe {
+            parse: Some(
+                Parse::from(
+                    File::new(path, &*Bytes::from(String::with_capacity(self.capacity)))
+                        .await
+                        .text(),
+                )
+                .unwrap(),
+            ),
+            paths: self.paths,
+            capacity: self.capacity,
+        }
+    }
+}
+
+impl<T> Probe for HttpProbe<T> {}
 
 /*
 
