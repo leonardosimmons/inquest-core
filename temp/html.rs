@@ -31,7 +31,7 @@ pub enum Headers {
     Invalid(Vec<String>),
 }
 impl Headers {
-    pub fn new(headers: Vec<String>, index: u8) -> Headers {
+    pub(crate) fn new(headers: Vec<String>, index: u8) -> Headers {
         match index {
             1 => Headers::H1(headers),
             2 => Headers::H2(headers),
@@ -39,7 +39,7 @@ impl Headers {
             4 => Headers::H4(headers),
             5 => Headers::H5(headers),
             6 => Headers::H6(headers),
-            _ => Headers::Invalid(vec![String::from("")]),
+            _ => Headers::Invalid(vec!["".to_string()]),
         }
     }
 }
@@ -63,13 +63,13 @@ pub trait RawHtml {
     fn document(&self) -> std::result::Result<Document, std::io::Error>;
 }
 
-pub trait HtmlParser {
+pub(crate) trait HtmlParser {
     fn bytes(&self) -> Bytes;
     fn document(&self) -> Result<Document>;
     fn text(&self) -> Result<String>;
 }
 
-pub trait HtmlController {
+pub(crate) trait HtmlController {
     fn descriptions(&self) -> Result<Vec<String>>;
     fn headers(&self, header: HtmlTag) -> Result<Headers>;
     fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>>;
@@ -77,17 +77,17 @@ pub trait HtmlController {
 }
 
 pub struct Html {
-    pub html: Arc<Mutex<Bytes>>,
+    pub(crate) html: Arc<Mutex<Bytes>>,
 }
 
 impl Html {
-    pub fn new(document: &str) -> Html {
+    pub(crate) fn new(document: &str) -> Html {
         Html {
             html: Arc::new(Mutex::new(Bytes::from(document.to_string()))),
         }
     }
 
-    pub async fn from_url(url: &str) -> Result<Html> {
+    pub(crate) async fn from_url(url: &str) -> Result<Html> {
         match reqwest::get(url).await {
             Ok(resp) => {
                 if let Ok(doc) = resp.text().await {

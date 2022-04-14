@@ -9,11 +9,9 @@ use select::predicate::{Name, Predicate};
 
 use crate::error::{Error, ErrorKind};
 use crate::html::{Headers, Html, HtmlController, RawHtml, HtmlParser, HtmlTag};
-use crate::utils::{Result, Unknown};
+use crate::utils::Result;
 
-pub trait Parser {
-    fn path_to_string(paths: PathBuf) -> String;
-}
+pub trait Parser {}
 
 pub struct Parse<T> {
     parse: T,
@@ -23,13 +21,13 @@ impl<T> Parse<T> {
     pub fn new(kind: T) -> Parse<T> {
         Parse { parse: kind }
     }
-}
 
-impl<T> Parser for Parse<T> {
-    fn path_to_string(paths: PathBuf) -> String {
+    pub fn path_to_string(paths: PathBuf) -> String {
         paths.to_str().unwrap_or_default().to_string()
     }
 }
+
+impl<T> Parser for Parse<T> {}
 
 impl<T> HtmlController for Parse<T>
     where
