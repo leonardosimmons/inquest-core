@@ -1,6 +1,6 @@
 #![allow(unused)]
 use inquest::cli::{Cli, HtmlOpts};
-use inquest::probe::{Probe, ProbeMain};
+use inquest::probe::{FileProbe, ProbeBuilder};
 
 #[tokio::main]
 async fn main() {

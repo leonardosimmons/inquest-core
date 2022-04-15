@@ -40,6 +40,44 @@ impl<T> Parser for Parse<T> {
     }
 }
 
+impl<T> Parse<T>
+where
+    T: HtmlDocument
+{
+    pub async fn from(document: &str, buf: &[u8]) -> Result<Parse<Html>> {
+        Ok(Parse {
+            parse: Html::from(document, buf).await?,
+        })
+    }
+
+    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
+        Ok(Parse::new(Html::from_url(html).await?))
+    }
+
+    pub async fn all_headers(&self, mut buff: Vec<Headers>) -> Result<Vec<Headers>> {
+        use HtmlTag::*;
+
+        let mut count = 1;
+        loop {
+            match count {
+                1 => buff.push(self.headers(H1).unwrap_or(Headers::H1(Vec::new()))),
+                2 => buff.push(self.headers(H2).unwrap_or(Headers::H2(Vec::new()))),
+                3 => buff.push(self.headers(H3).unwrap_or(Headers::H3(Vec::new()))),
+                4 => buff.push(self.headers(H4).unwrap_or(Headers::H4(Vec::new()))),
+                5 => buff.push(self.headers(H5).unwrap_or(Headers::H5(Vec::new()))),
+                6 => buff.push(self.headers(H6).unwrap_or(Headers::H6(Vec::new()))),
+                _ => break,
+            };
+            count = count + 1;
+        }
+        Ok(buff)
+    }
+
+    pub async fn all_links(&self) -> Result<Vec<String>> {
+        self.links(Name("a"))
+    }
+}
+
 impl<T> HtmlParser for Parse<T>
 where
     T: HtmlDocument,
@@ -133,40 +171,5 @@ where
         } else {
             Err(Error::from(ErrorKind::Html))
         }
-    }
-}
-
-impl Parse<Html> {
-    pub async fn from(document: &str, buf: &[u8]) -> Result<Parse<Html>> {
-        Ok(Parse {
-            parse: Html::from(document, buf).await?,
-        })
-    }
-
-    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
-        Ok(Parse::new(Html::from_url(html).await?))
-    }
-
-    pub async fn all_headers(&self, mut buff: Vec<Headers>) -> Result<Vec<Headers>> {
-        use HtmlTag::*;
-
-        let mut count = 1;
-        loop {
-            match count {
-                1 => buff.push(self.headers(H1).unwrap_or(Headers::H1(Vec::new()))),
-                2 => buff.push(self.headers(H2).unwrap_or(Headers::H2(Vec::new()))),
-                3 => buff.push(self.headers(H3).unwrap_or(Headers::H3(Vec::new()))),
-                4 => buff.push(self.headers(H4).unwrap_or(Headers::H4(Vec::new()))),
-                5 => buff.push(self.headers(H5).unwrap_or(Headers::H5(Vec::new()))),
-                6 => buff.push(self.headers(H6).unwrap_or(Headers::H6(Vec::new()))),
-                _ => break,
-            };
-            count = count + 1;
-        }
-        Ok(buff)
-    }
-
-    pub async fn all_links(&self) -> Result<Vec<String>> {
-        self.links(Name("a"))
     }
 }

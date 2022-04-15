@@ -15,46 +15,52 @@ enum Origin {
     Url,
 }
 
-pub trait Probe {}
+pub trait FileProbe {}
 
-pub struct Initialized {
+pub struct Configuration {
     capacity: usize,
 }
 
-pub struct DocumentProbe<Parser> {
+pub struct DocumentProbe<T>
+    where
+        T: Parser
+{
     capacity: usize,
     paths: Vec<PathBuf>,
-    parse: Option<Parser>,
+    parse: Option<T>,
 }
 
-pub struct HttpProbe<Parser> {
+pub struct HttpProbe<T>
+where
+    T: Parser
+{
     capacity: usize,
     urls: Vec<String>,
-    parse: Option<Parser>,
+    parse: Option<T>,
 }
 
-pub struct ProbeMain<S> {
+pub struct ProbeBuilder<S> {
     state: S,
 }
 
-impl<S> ProbeMain<S> {
-    pub fn new() -> ProbeMain<Initialized> {
-        ProbeMain {
-            state: Initialized {
+impl<S> ProbeBuilder<S> {
+    pub fn new() -> ProbeBuilder<Configuration> {
+        ProbeBuilder {
+            state: Configuration {
                 capacity: DEFAULT_PROBE_CAPACITY,
             },
         }
     }
 }
 
-impl ProbeMain<Initialized> {
+impl ProbeBuilder<Configuration> {
     pub fn capacity(mut self, capacity: usize) -> Self {
         self.state.capacity = capacity;
         self
     }
 
-    pub fn document<T>(self) -> ProbeMain<DocumentProbe<T>> {
-        ProbeMain {
+    pub fn document<T: Parser>(self) -> ProbeBuilder<DocumentProbe<T>> {
+        ProbeBuilder {
             state: DocumentProbe {
                 capacity: self.state.capacity,
                 paths: Vec::new(),
@@ -63,8 +69,8 @@ impl ProbeMain<Initialized> {
         }
     }
 
-    pub fn http<T>(self) -> ProbeMain<HttpProbe<T>> {
-        ProbeMain {
+    pub fn http<T: Parser>(self) -> ProbeBuilder<HttpProbe<T>> {
+        ProbeBuilder {
             state: HttpProbe {
                 capacity: self.state.capacity,
                 urls: Vec::new(),
@@ -74,31 +80,38 @@ impl ProbeMain<Initialized> {
     }
 }
 
-impl<Parser> Probe for DocumentProbe<Parser> {}
-
-impl<Parser> DocumentProbe<Parser>
+impl<T> ProbeBuilder<DocumentProbe<T>>
 where
-    Parser: HtmlDocument + HtmlParser,
+    T: Parser
 {
     pub async fn html(mut self, path: &str) -> DocumentProbe<Parse<Html>> {
         DocumentProbe {
             parse: Some(
-                Parse::from(
-                    File::new(path, &*Bytes::from(String::with_capacity(self.capacity)))
+                Parse::<Html>::from(
+                    File::new(path, &*Bytes::from(String::with_capacity(self.state.capacity)))
                         .await
                         .text(),
-                    String::with_capacity(self.capacity).as_bytes()
+                    String::with_capacity(self.state.capacity).as_bytes()
                 )
-                .await
-                .unwrap(),
+                    .await
+                    .unwrap(),
             ),
-            paths: self.paths,
-            capacity: self.capacity,
+            paths: self.state.paths,
+            capacity: self.state.capacity,
         }
     }
 }
 
-impl<T> Probe for HttpProbe<T> {}
+impl<T: Parser> FileProbe for DocumentProbe<T> {}
+
+impl<T> DocumentProbe<T>
+where
+    T: Parser + HtmlParser,
+{
+
+}
+
+impl<T: Parser> FileProbe for HttpProbe<T> {}
 
 /*
 
