@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use crate::cli::Cli;
 use crate::file::File;
-use crate::html::{Html, HtmlParser, HtmlDocument};
+use crate::html::{Html, HtmlDocument, HtmlParser};
 use crate::parse::{Parse, Parser};
-use crate::utils::{Result, Unknown};
+use crate::utils::Result;
 
 const DEFAULT_PROBE_CAPACITY: usize = 4096;
 
@@ -15,15 +15,21 @@ enum Origin {
     Url,
 }
 
-pub trait FileProbe {}
+pub trait FromFile {
+    fn file(self, path: PathBuf) -> Self;
+}
+
+pub trait FromUrl {
+    fn url(self, url: &str) -> Self;
+}
 
 pub struct Configuration {
     capacity: usize,
 }
 
 pub struct DocumentProbe<T>
-    where
-        T: Parser
+where
+    T: Parser,
 {
     capacity: usize,
     paths: Vec<PathBuf>,
@@ -32,7 +38,7 @@ pub struct DocumentProbe<T>
 
 pub struct HttpProbe<T>
 where
-    T: Parser
+    T: Parser,
 {
     capacity: usize,
     urls: Vec<String>,
@@ -40,7 +46,7 @@ where
 }
 
 pub struct ProbeBuilder<S> {
-    state: S,
+    pub state: S,
 }
 
 impl<S> ProbeBuilder<S> {
@@ -80,38 +86,80 @@ impl ProbeBuilder<Configuration> {
     }
 }
 
+impl<T: Parser> DocumentProbe<T> {
+    pub fn paths(self, paths: Vec<PathBuf>) -> Self {
+        Self {
+            capacity: self.capacity,
+            parse: self.parse,
+            paths,
+        }
+    }
+}
+
+impl<T: Parser> HttpProbe<T> {
+    pub fn urls(self, urls: Vec<String>) -> Self {
+        Self {
+            capacity: self.capacity,
+            parse: self.parse,
+            urls
+        }
+    }
+}
+
+impl<T> From<ProbeBuilder<Configuration>> for ProbeBuilder<DocumentProbe<T>>
+where
+    T: Parser,
+{
+    fn from(config: ProbeBuilder<Configuration>) -> Self {
+        ProbeBuilder {
+            state: DocumentProbe {
+                capacity: config.state.capacity,
+                paths: Vec::new(),
+                parse: None,
+            },
+        }
+    }
+}
+
+impl<T> From<ProbeBuilder<Configuration>> for ProbeBuilder<HttpProbe<T>>
+where
+    T: Parser,
+{
+    fn from(config: ProbeBuilder<Configuration>) -> Self {
+        ProbeBuilder {
+            state: HttpProbe {
+                capacity: config.state.capacity,
+                urls: Vec::new(),
+                parse: None,
+            },
+        }
+    }
+}
+
 impl<T> ProbeBuilder<DocumentProbe<T>>
 where
-    T: Parser
+    T: Parser,
 {
     pub async fn html(mut self, path: &str) -> DocumentProbe<Parse<Html>> {
         DocumentProbe {
             parse: Some(
                 Parse::<Html>::from(
-                    File::new(path, &*Bytes::from(String::with_capacity(self.state.capacity)))
-                        .await
-                        .text(),
-                    String::with_capacity(self.state.capacity).as_bytes()
-                )
+                    File::new(
+                        path,
+                        &*Bytes::from(String::with_capacity(self.state.capacity)),
+                    )
                     .await
-                    .unwrap(),
+                    .text(),
+                    String::with_capacity(self.state.capacity).as_bytes(),
+                )
+                .await
+                .unwrap(),
             ),
             paths: self.state.paths,
             capacity: self.state.capacity,
         }
     }
 }
-
-impl<T: Parser> FileProbe for DocumentProbe<T> {}
-
-impl<T> DocumentProbe<T>
-where
-    T: Parser + HtmlParser,
-{
-
-}
-
-impl<T: Parser> FileProbe for HttpProbe<T> {}
 
 /*
 
