@@ -8,7 +8,6 @@ async fn main() {
 
     match opts.command() {
         HtmlOpts::Links(opts) => {
-            let test = ProbeMain::new().capacity(5000).document().;
             println!("tags: {:?}", opts.tags.as_ref().unwrap());
             println!("path: {:?}", opts.paths.as_ref().unwrap());
         }

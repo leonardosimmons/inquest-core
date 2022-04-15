@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use crate::cli::Cli;
 use crate::file::File;
-use crate::html::{Html, HtmlController, HtmlParser};
-use crate::parse::{Base, Parse, Parser};
+use crate::html::{Html, HtmlParser, HtmlDocument};
+use crate::parse::{Parse, Parser};
 use crate::utils::{Result, Unknown};
 
 const DEFAULT_PROBE_CAPACITY: usize = 4096;
@@ -78,7 +78,7 @@ impl<Parser> Probe for DocumentProbe<Parser> {}
 
 impl<Parser> DocumentProbe<Parser>
 where
-    Parser: HtmlParser + HtmlController,
+    Parser: HtmlDocument + HtmlParser,
 {
     pub async fn html(mut self, path: &str) -> DocumentProbe<Parse<Html>> {
         DocumentProbe {
@@ -87,7 +87,9 @@ where
                     File::new(path, &*Bytes::from(String::with_capacity(self.capacity)))
                         .await
                         .text(),
+                    String::with_capacity(self.capacity).as_bytes()
                 )
+                .await
                 .unwrap(),
             ),
             paths: self.paths,

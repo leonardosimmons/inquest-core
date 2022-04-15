@@ -1,21 +1,15 @@
-#![allow(unused)]
 use std::path::PathBuf;
-use std::str;
-use std::sync::Arc;
 
-use bytes::Bytes;
-use select::document::Document;
 use select::predicate::{Name, Predicate};
 
 use crate::error::{Error, ErrorKind};
-use crate::html::{Headers, Html, HtmlController, RawHtml, HtmlParser, HtmlTag};
-use crate::utils::{Result, Unknown};
+use crate::html::{Headers, Html, HtmlDocument, HtmlParser, HtmlTag};
+use crate::utils::Result;
 
 pub trait Parser {
+    fn fix_link(link: &str) -> &str;
     fn path_to_string(paths: PathBuf) -> String;
 }
-
-pub struct Base;
 
 pub struct Parse<T> {
     parse: T,
@@ -25,58 +19,132 @@ impl<T> Parse<T> {
     pub fn new(kind: T) -> Parse<T> {
         Parse { parse: kind }
     }
-    
-    pub fn set(mut self, kind: T) -> Self { 
+
+    pub fn set(mut self, kind: T) -> Self {
         self.parse = kind;
         self
     }
 }
 
-impl<T> HtmlController for Parse<T>
-    where
-        T: HtmlController
-{
-    fn descriptions(&self) -> Result<Vec<String>> {
-        self.parse.descriptions()
-    }
-
-    fn headers(&self, header: HtmlTag) -> Result<Headers> {
-        self.parse.headers(header)
-    }
-
-    fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
-        self.parse.links(predicate)
-    }
-
-    fn page_title(&self) -> Result<Vec<String>> {
-        self.parse.page_title()
-    }
-}
-
 impl<T> Parser for Parse<T> {
-    fn path_to_string(paths: PathBuf) -> String {
-        paths.to_str().unwrap_or_default().to_string()
-    }
-}
-
-impl Parse<Html> {
-    pub fn from(document: &str) -> Result<Parse<Html>> {
-        Ok(Parse {
-            parse: Html::new(document),
-        })
-    }
-
-    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
-        Ok(Parse::new(Html::from_url(html).await?))
-    }
-
-    /// Trims `https://` from the start and `/` from the end of the link (if applicable)
-    pub fn fix_link(link: &str) -> &str {
+    fn fix_link(link: &str) -> &str {
         link.trim_start_matches("https")
             .trim_start_matches("http")
             .trim_start_matches(":")
             .trim_start_matches("//")
             .trim_end_matches('/')
+    }
+
+    fn path_to_string(paths: PathBuf) -> String {
+        paths.to_str().unwrap_or_default().to_string()
+    }
+}
+
+impl<T> HtmlParser for Parse<T>
+where
+    T: HtmlDocument,
+{
+    fn descriptions(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc
+                .find(Name("meta"))
+                .filter_map(|n| match n.attr("name") {
+                    Some(name) => {
+                        if name.contains("description") {
+                            Some(name.to_string())
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                })
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Html))
+        }
+    }
+
+    fn headers(&self, header: HtmlTag) -> Result<Headers> {
+        match self.parse.document() {
+            Ok(doc) => match header {
+                HtmlTag::H1 => Ok(Headers::new(
+                    doc.find(Name("h1"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    1,
+                )),
+                HtmlTag::H2 => Ok(Headers::new(
+                    doc.find(Name("h2"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    2,
+                )),
+                HtmlTag::H3 => Ok(Headers::new(
+                    doc.find(Name("h3"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    3,
+                )),
+                HtmlTag::H4 => Ok(Headers::new(
+                    doc.find(Name("h4"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    4,
+                )),
+                HtmlTag::H5 => Ok(Headers::new(
+                    doc.find(Name("h5"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    5,
+                )),
+                HtmlTag::H6 => Ok(Headers::new(
+                    doc.find(Name("h6"))
+                        .filter_map(|n| Some(n.text()))
+                        .collect(),
+                    6,
+                )),
+                _ => Ok(Headers::Invalid(Vec::new())),
+            },
+            Err(_) => Err(Error::from(ErrorKind::Parse)),
+        }
+    }
+
+    fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc
+                .find(predicate)
+                .filter_map(|n| {
+                    if let Some(link) = n.attr("href") {
+                        Some(Parse::<&str>::fix_link(link))
+                    } else {
+                        None
+                    }
+                })
+                .map(|x| x.to_string())
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Html))
+        }
+    }
+
+    fn page_title(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc.find(Name("title")).map(|t| t.text()).collect())
+        } else {
+            Err(Error::from(ErrorKind::Html))
+        }
+    }
+}
+
+impl Parse<Html> {
+    pub async fn from(document: &str, buf: &[u8]) -> Result<Parse<Html>> {
+        Ok(Parse {
+            parse: Html::from(document, buf).await?,
+        })
+    }
+
+    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
+        Ok(Parse::new(Html::from_url(html).await?))
     }
 
     pub async fn all_headers(&self, mut buff: Vec<Headers>) -> Result<Vec<Headers>> {
@@ -100,35 +168,5 @@ impl Parse<Html> {
 
     pub async fn all_links(&self) -> Result<Vec<String>> {
         self.links(Name("a"))
-    }
-}
-
-impl HtmlParser for Parse<Html> {
-    fn bytes(&self) -> Bytes {
-        Arc::clone(&self.parse.html).lock().unwrap().clone()
-    }
-
-    fn document(&self) -> Result<Document> {
-        if let Ok(doc) = self.parse.document() {
-            Ok(doc)
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-
-    fn text(&self) -> Result<String> {
-        if let Ok(text) = str::from_utf8(&*Arc::clone(&self.parse.html).lock().unwrap()) {
-            Ok(text.to_owned())
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-}
-
-impl Default for Parse<Html> {
-    fn default() -> Self {
-        Parse {
-            parse: Html::new("")
-        }
     }
 }

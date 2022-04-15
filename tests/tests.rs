@@ -15,7 +15,7 @@ mod parse {
 
     #[tokio::test]
     async fn get_headers() {
-        let h1_header = match Parse::new(Html::new(test_file().await))
+        let h1_header = match Parse::new(Html::from(test_file().await))
             .header(HtmlTag::H1)
             .await
             .unwrap()
@@ -29,7 +29,7 @@ mod parse {
 
     #[tokio::test]
     async fn get_links() {
-        let links = Parse::new(Html::new(test_file().await))
+        let links = Parse::new(Html::from(test_file().await))
             .all_links()
             .await
             .unwrap();
@@ -39,7 +39,7 @@ mod parse {
 
     #[tokio::test]
     async fn get_title() {
-        let title = Parse::new(Html::new(test_file().await))
+        let title = Parse::new(Html::from(test_file().await))
             .page_title()
             .await
             .unwrap()[0]

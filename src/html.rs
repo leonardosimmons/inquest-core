@@ -1,16 +1,18 @@
-#![allow(unused)]
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::str;
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use reqwest;
 use select::document::Document;
-use select::predicate::{Name, Predicate};
+use select::predicate::Predicate;
 
 use crate::error::{Error, ErrorKind};
-use crate::parse::Parse;
+use crate::file::File;
 use crate::utils::Result;
 
+#[derive(Debug)]
 pub enum HtmlTag {
     H1,
     H2,
@@ -19,6 +21,20 @@ pub enum HtmlTag {
     H5,
     H6,
     Invalid,
+}
+
+impl Display for HtmlTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HtmlTag::H1 => write!(f, "h1"),
+            HtmlTag::H2 => write!(f, "h2"),
+            HtmlTag::H3 => write!(f, "h3"),
+            HtmlTag::H4 => write!(f, "h4"),
+            HtmlTag::H5 => write!(f, "h5"),
+            HtmlTag::H6 => write!(f, "h6"),
+            HtmlTag::Invalid => write!(f, "invalid"),
+        }
+    }
 }
 
 pub enum Headers {
@@ -59,17 +75,13 @@ impl Deref for Headers {
     }
 }
 
-pub trait RawHtml {
-    fn document(&self) -> std::result::Result<Document, std::io::Error>;
-}
-
-pub trait HtmlParser {
+pub trait HtmlDocument {
     fn bytes(&self) -> Bytes;
     fn document(&self) -> Result<Document>;
     fn text(&self) -> Result<String>;
 }
 
-pub trait HtmlController {
+pub trait HtmlParser {
     fn descriptions(&self) -> Result<Vec<String>>;
     fn headers(&self, header: HtmlTag) -> Result<Headers>;
     fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>>;
@@ -81,17 +93,19 @@ pub struct Html {
 }
 
 impl Html {
-    pub fn new(document: &str) -> Html {
-        Html {
-            html: Arc::new(Mutex::new(Bytes::from(document.to_string()))),
-        }
+    pub async fn from(path: &str, buf: &[u8]) -> Result<Html> {
+        Ok(Html {
+            html: Arc::new(Mutex::new(Bytes::from(File::from(path, buf).await?))),
+        })
     }
 
     pub async fn from_url(url: &str) -> Result<Html> {
         match reqwest::get(url).await {
             Ok(resp) => {
                 if let Ok(doc) = resp.text().await {
-                    Ok(Html::new(&doc))
+                    Ok(Html {
+                        html: Arc::new(Mutex::new(Bytes::from(doc))),
+                    })
                 } else {
                     Err(Error::from(ErrorKind::Html))
                 }
@@ -101,101 +115,30 @@ impl Html {
     }
 }
 
-impl RawHtml for Html {
-    fn document(&self) -> std::result::Result<Document, std::io::Error> {
-        Document::from_read(&**Arc::clone(&self.html).lock().unwrap())
+impl HtmlDocument for Html {
+    fn bytes(&self) -> Bytes {
+        Arc::clone(&self.html).lock().unwrap().to_vec().into()
+    }
+
+    fn document(&self) -> Result<Document> {
+        match Document::from_read(&**Arc::clone(&self.html).lock().unwrap()) {
+            Ok(doc) => Ok(doc),
+            Err(_) => Err(Error::from(ErrorKind::Parse)),
+        }
+    }
+
+    fn text(&self) -> Result<String> {
+        match str::from_utf8(&**Arc::clone(&self.html).lock().unwrap()) {
+            Ok(text) => Ok(text.to_owned()),
+            Err(_) => Err(Error::from(ErrorKind::Parse)),
+        }
     }
 }
 
-impl HtmlController for Html {
-    fn descriptions(&self) -> Result<Vec<String>> {
-        if let Ok(doc) = self.document() {
-            Ok(doc
-                .find(Name("meta"))
-                .filter_map(|n| match n.attr("name") {
-                    Some(name) => {
-                        if name.contains("description") {
-                            Some(name.to_string())
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                })
-                .collect())
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-
-    fn headers(&self, header: HtmlTag) -> Result<Headers> {
-        match self.document() {
-            Ok(doc) => match header {
-                HtmlTag::H1 => Ok(Headers::new(
-                    doc.find(Name("h1"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    1,
-                )),
-                HtmlTag::H2 => Ok(Headers::new(
-                    doc.find(Name("h2"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    2,
-                )),
-                HtmlTag::H3 => Ok(Headers::new(
-                    doc.find(Name("h3"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    3,
-                )),
-                HtmlTag::H4 => Ok(Headers::new(
-                    doc.find(Name("h4"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    4,
-                )),
-                HtmlTag::H5 => Ok(Headers::new(
-                    doc.find(Name("h5"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    5,
-                )),
-                HtmlTag::H6 => Ok(Headers::new(
-                    doc.find(Name("h6"))
-                        .filter_map(|n| Some(n.text()))
-                        .collect(),
-                    6,
-                )),
-                _ => Ok(Headers::Invalid(Vec::new())),
-            },
-            Err(err) => Err(Error::from(ErrorKind::Parse)),
-        }
-    }
-
-    fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
-        if let Ok(doc) = self.document() {
-            Ok(doc
-                .find(predicate)
-                .filter_map(|n| {
-                    if let Some(link) = n.attr("href") {
-                        Some(Parse::fix_link(link))
-                    } else {
-                        None
-                    }
-                })
-                .map(|x| x.to_string())
-                .collect())
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-
-    fn page_title(&self) -> Result<Vec<String>> {
-        if let Ok(doc) = self.document() {
-            Ok(doc.find(Name("title")).map(|t| t.text()).collect())
-        } else {
-            Err(Error::from(ErrorKind::Html))
+impl Default for Html {
+    fn default() -> Self {
+        Self {
+            html: Arc::new(Mutex::new(Bytes::from(""))),
         }
     }
 }
