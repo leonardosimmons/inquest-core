@@ -1,19 +1,18 @@
 #![allow(unused)]
 
-#[derive(Debug)]
-pub enum ErrorType {
-    Simple(ErrorKind),
-    SimpleMessage(ErrorKind, &'static &'static str),
-}
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum ErrorKind {
     Create,
     Delete,
+    Document,
     EndOfStream,
     Failed,
     FileNotFound,
     Html,
+    Http,
     InvalidData,
     InvalidHtmlTag,
     InvalidInput,
@@ -35,10 +34,12 @@ impl ErrorKind {
         match *self {
             Create => "unable to create",
             Delete => "unable to delete",
+            Document => "document failed",
             EndOfStream => "end of stream",
             Failed => "failed",
             FileNotFound => "file not found",
             Html => "html error",
+            Http => "Http error",
             InvalidData => "invalid data",
             InvalidHtmlTag => "invalid HTML tag",
             InvalidInput => "invalid input",
@@ -51,6 +52,21 @@ impl ErrorKind {
             Parse => "parsing error",
             Unimplemented => "unimplemented",
             Unknown => "unexpected error has occurred",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ErrorType {
+    Simple(ErrorKind),
+    SimpleMessage(ErrorKind, &'static &'static str),
+}
+
+impl Display for ErrorType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorType::Simple(err) => write!(f, "{}", err.to_str()),
+            ErrorType::SimpleMessage(err, &msg) => write!(f, "{}: {}", err.to_str(), &msg)
         }
     }
 }

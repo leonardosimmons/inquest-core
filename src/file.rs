@@ -14,17 +14,17 @@ pub struct File {
 }
 
 impl File {
-    pub async fn new(path: &str, mut buf: &[u8]) -> File {
+    pub async fn new(path: &str, mut buf: String) -> File {
         File {
             text: File::from(path, buf).await.unwrap(),
         }
     }
 
-    pub async fn from(path: &str, mut buf: &[u8]) -> Result<String> {
+    pub async fn from(path: &str, mut buf: String) -> Result<String> {
         match TokioFile::open(path).await {
             Ok(mut f) => {
-                if let Ok(_) = f.read_to_string(&mut str::from_utf8(buf).unwrap().to_string()).await {
-                    Ok(str::from_utf8(buf).unwrap().to_string())
+                if let Ok(_) = f.read_to_string(&mut buf).await {
+                    Ok(buf)
                 } else {
                     Err(Error::from(ErrorKind::InvalidUtf8))
                 }

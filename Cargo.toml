@@ -5,6 +5,7 @@ edition = "2021"
 description = "An SEO Utility CLI tool"
 
 [dependencies]
+async-trait = "0.1.53"
 atoi = "1.0.0"
 chrono = "0.4"
 csv = "1.1"
