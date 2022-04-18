@@ -136,7 +136,7 @@ where
     fn header(&self, header: HtmlTag) -> Result<Headers> {
         if let Ok(doc) = self.parse.document() {
             Ok(Headers::new(
-                doc.find(Name(header.clone().into()))
+                doc.find(Name(&header.to_string()[..]))
                     .filter_map(|n| Some(n.text()))
                     .collect(),
                 header.into(),
