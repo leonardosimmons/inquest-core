@@ -168,6 +168,6 @@ where
     }
 
     pub fn all_headers(&self) -> Result<Vec<Headers>> {
-        self.parse.all_headers(vec![])
+        self.parse.all_headers(Vec::new())
     }
 }
