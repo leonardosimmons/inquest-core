@@ -6,7 +6,7 @@ async fn main() {
     let buff = String::with_capacity(4096);
     let probe = Probe::new().document().buffer(buff).html();
 
-    match probe.from("tests/test.html").await {
+    match probe.from("tests/stackoverflow.html").await {
         Ok(probe) => {
             if let Ok(desc) = probe.descriptions() {
                 println!("{:?}", desc);

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use select::predicate::{Name, Predicate};
 
 use crate::error::{Error, ErrorKind};
-use crate::html::{Headers, Html, HtmlAttribute, HtmlDocument, HtmlParser, HtmlTag};
+use crate::html::{Headers, HtmlAttribute, HtmlDocument, HtmlParser, HtmlTag};
 use crate::utils::Result;
 
 #[async_trait]
@@ -54,11 +54,6 @@ impl<T> Parse<T> {
     pub fn new(kind: T) -> Parse<T> {
         Parse { parse: kind }
     }
-
-    pub fn set(mut self, kind: T) -> Self {
-        self.parse = kind;
-        self
-    }
 }
 
 impl<T> Parser for Parse<T> {}
@@ -91,14 +86,6 @@ impl<T> Parse<T>
 where
     T: HtmlDocument,
 {
-    pub async fn from_path(document: &str, buf: String) -> Result<Parse<Html>> {
-        Ok(Parse::new(Html::from_path(document, buf).await?))
-    }
-
-    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
-        Ok(Parse::new(Html::from_url(html).await?))
-    }
-
     pub fn all_headers(&self, mut buff: Vec<Headers>) -> Result<Vec<Headers>> {
         let mut count = 1;
         loop {

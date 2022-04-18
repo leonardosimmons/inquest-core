@@ -192,29 +192,6 @@ pub struct Html {
     html: Arc<Mutex<Bytes>>,
 }
 
-impl Html {
-    pub async fn from_path(path: &str, buf: String) -> Result<Html> {
-        Ok(Html {
-            html: Arc::new(Mutex::new(Bytes::from(File::from(path, buf).await?))),
-        })
-    }
-
-    pub async fn from_url(url: &str) -> Result<Html> {
-        match reqwest::get(url).await {
-            Ok(resp) => {
-                if let Ok(doc) = resp.text().await {
-                    Ok(Html {
-                        html: Arc::new(Mutex::new(Bytes::from(doc))),
-                    })
-                } else {
-                    Err(Error::from(ErrorKind::Html))
-                }
-            }
-            Err(_) => Err(Error::from(ErrorKind::Http)),
-        }
-    }
-}
-
 impl Default for Html {
     fn default() -> Self {
         Self {

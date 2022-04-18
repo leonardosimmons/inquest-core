@@ -7,7 +7,6 @@ use crate::utils::Result;
 
 const DEFAULT_BUFFER_CAPACITY: usize = 4096;
 
-
 pub struct DocumentProbe<T>
 where
     T: Parser,
@@ -74,6 +73,16 @@ where
     }
 }
 
+impl DocumentProbe<Parse<Default>> {
+    pub fn html(self) -> DocumentProbe<Parse<Html>> {
+        DocumentProbe {
+            buff: self.buff,
+            parse: Parse::new(Html::default()),
+            path: self.path,
+        }
+    }
+}
+
 impl<T> DocumentProbe<Parse<T>>
 where
     T: HtmlDocument,
@@ -108,25 +117,24 @@ where
     }
 }
 
-impl DocumentProbe<Parse<Default>> {
-    pub fn html(self) -> DocumentProbe<Parse<Html>> {
-        DocumentProbe {
-            buff: self.buff,
-            parse: Parse::new(Html::default()),
-            path: self.path,
-        }
-    }
-}
-
 impl<T> HttpProbe<T>
-    where
-        T: Parser + FromUrl + Send,
+where
+    T: Parser + FromUrl + Send,
 {
     pub async fn from(mut self, url: &str) -> Result<Self> {
         Ok(Self {
             url: url.to_string(),
             parse: self.parse.from(url).await?,
         })
+    }
+}
+
+impl HttpProbe<Parse<Default>> {
+    pub fn html(self) -> HttpProbe<Parse<Html>> {
+        HttpProbe {
+            parse: Parse::new(Html::default()),
+            url: self.url,
+        }
     }
 }
 
@@ -151,18 +159,9 @@ where
     }
 }
 
-impl HttpProbe<Parse<Default>> {
-    pub fn html(self) -> HttpProbe<Parse<Html>> {
-        HttpProbe {
-            parse: Parse::new(Html::default()),
-            url: self.url,
-        }
-    }
-}
-
 impl<T> HttpProbe<Parse<T>>
-    where
-        T: HtmlDocument,
+where
+    T: HtmlDocument,
 {
     pub fn all_links(&self) -> Result<Vec<String>> {
         self.parse.all_links()
