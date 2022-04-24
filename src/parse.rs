@@ -12,7 +12,7 @@ pub trait FromPath
 where
     Self: Sized,
 {
-    async fn from(&mut self, path: &str, buf: String) -> Result<Self>;
+    async fn from(&mut self, path: &str, capacity: usize) -> Result<Self>;
 }
 
 #[async_trait]
@@ -63,9 +63,9 @@ impl<T> FromPath for Parse<T>
 where
     T: FromPath + Send,
 {
-    async fn from(&mut self, path: &str, buf: String) -> Result<Self> {
+    async fn from(&mut self, path: &str, capacity: usize) -> Result<Self> {
         Ok(Self {
-            parse: self.parse.from(path, buf).await?,
+            parse: self.parse.from(path, capacity).await?,
         })
     }
 }

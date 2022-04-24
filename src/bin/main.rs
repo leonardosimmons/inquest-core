@@ -3,8 +3,7 @@ use inquest::probe::Probe;
 
 #[tokio::main]
 async fn main() {
-    let buff = String::with_capacity(4096);
-    let probe = Probe::new().document().buffer(buff).html();
+    let probe = Probe::new().document().buffer(4096).html();
 
     match probe.from("tests/stackoverflow.html").await {
         Ok(probe) => {

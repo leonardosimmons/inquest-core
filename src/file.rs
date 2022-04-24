@@ -1,8 +1,5 @@
-#![allow(unused)]
-use std::io::Bytes;
 use std::str;
 
-use bytes::BytesMut;
 use tokio::fs::File as TokioFile;
 use tokio::io::AsyncReadExt;
 
@@ -14,9 +11,9 @@ pub struct File {
 }
 
 impl File {
-    pub async fn new(path: &str, mut buf: String) -> File {
+    pub async fn new(path: &str, capacity: usize) -> File {
         File {
-            text: File::from(path, buf).await.unwrap(),
+            text: File::from(path, String::with_capacity(capacity)).await.unwrap(),
         }
     }
 

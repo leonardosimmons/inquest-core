@@ -11,7 +11,7 @@ pub struct DocumentProbe<T>
 where
     T: Parser,
 {
-    buff: String,
+    capacity: usize,
     path: String,
     parse: T,
 }
@@ -33,7 +33,7 @@ impl Probe {
 impl Probe {
     pub fn document(self) -> DocumentProbe<Parse<Default>> {
         DocumentProbe {
-            buff: String::with_capacity(DEFAULT_BUFFER_CAPACITY),
+            capacity: DEFAULT_BUFFER_CAPACITY,
             path: String::new(),
             parse: Parse::<Default>::default(),
         }
@@ -51,9 +51,9 @@ impl<T> DocumentProbe<T>
 where
     T: Parser,
 {
-    pub fn buffer(self, buff: String) -> Self {
+    pub fn buffer(self, capacity: usize) -> Self {
         Self {
-            buff,
+            capacity,
             parse: self.parse,
             path: self.path,
         }
@@ -66,9 +66,9 @@ where
 {
     pub async fn from(mut self, path: &str) -> Result<Self> {
         Ok(Self {
-            buff: self.buff.clone(),
+            capacity: self.capacity,
             path: path.to_string(),
-            parse: self.parse.from(path, self.buff).await?,
+            parse: self.parse.from(path, self.capacity).await?,
         })
     }
 }
@@ -76,7 +76,7 @@ where
 impl DocumentProbe<Parse<Default>> {
     pub fn html(self) -> DocumentProbe<Parse<Html>> {
         DocumentProbe {
-            buff: self.buff,
+            capacity: self.capacity,
             parse: Parse::new(Html::default()),
             path: self.path,
         }

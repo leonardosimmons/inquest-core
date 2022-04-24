@@ -202,10 +202,10 @@ impl Default for Html {
 
 #[async_trait]
 impl FromPath for Html {
-    async fn from(&mut self, path: &str, buf: String) -> Result<Self> {
+    async fn from(&mut self, path: &str, capacity: usize) -> Result<Self> {
         Ok(Self {
             html: Arc::new(Mutex::new(Bytes::from(
-                File::from(path, buf).await?,
+                File::from(path, String::with_capacity(capacity)).await?,
             ))),
         })
     }
@@ -231,18 +231,18 @@ impl FromUrl for Html {
 
 impl HtmlDocument for Html {
     fn bytes(&self) -> Bytes {
-        Arc::clone(&self.html).lock().unwrap().to_vec().into()
+        self.html.clone().lock().unwrap().to_vec().into()
     }
 
     fn document(&self) -> Result<Document> {
-        match Document::from_read(&**Arc::clone(&self.html).lock().unwrap()) {
+        match Document::from_read(&**self.html.clone().lock().unwrap()) {
             Ok(doc) => Ok(doc),
             Err(_) => Err(Error::from(ErrorKind::Document)),
         }
     }
 
     fn text(&self) -> Result<String> {
-        match str::from_utf8(&**Arc::clone(&self.html).lock().unwrap()) {
+        match str::from_utf8(&self.html.clone().lock().unwrap()) {
             Ok(text) => Ok(text.to_string()),
             Err(_) => Err(Error::from(ErrorKind::Parse)),
         }
