@@ -5,7 +5,7 @@ use crate::html::{Headers, Html, HtmlDocument, HtmlParser, HtmlTag};
 use crate::parse::{Default, FromPath, FromUrl, Parse, Parser};
 use crate::utils::Result;
 
-const DEFAULT_BUFFER_CAPACITY: usize = 4096;
+const DEFAULT_BUFFER_CAPACITY: usize = 4 * 1024 * 1024; // 4mb
 
 pub struct DocumentProbe<T>
 where
@@ -41,7 +41,7 @@ impl Probe {
 
     pub fn http(self) -> HttpProbe<Parse<Default>> {
         HttpProbe {
-            url: String::from(""),
+            url: String::new(),
             parse: Parse::<Default>::default(),
         }
     }
