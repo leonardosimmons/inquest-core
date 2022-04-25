@@ -37,6 +37,8 @@ pub enum HtmlOpts {
     #[structopt(name = "title")]
     /// Returns the title of the page
     PageTitle(HtmlParseOpts),
+    /// Error Value
+    NotSelected
 }
 
 #[derive(StructOpt, Clone, Debug)]
@@ -58,9 +60,12 @@ impl Cli {
         Cli::from_args()
     }
 
-    pub fn command(&self) -> &HtmlOpts {
-        match self.deref().borrow() {
-            CommandOpts::Probe(opts) => opts,
+    pub fn command(self) -> HtmlOpts {
+        match self.cmd {
+            Some(cmd) => match cmd {
+                CommandOpts::Probe(opts) => opts,
+            }
+            None => HtmlOpts::NotSelected
         }
     }
 }
