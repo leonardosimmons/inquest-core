@@ -1,19 +1,21 @@
-use env_logger::Env;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
+use pretty_env_logger;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
+const IP_ADDRESS: [u8; 4] = [127, 0, 0, 1];
 const LOGGING_FILTER: &str = "server=trace";
+const PORT: u16 = 3000;
 const TEST_HANDLE_DURATION: u64 = 2;
 
 #[tokio::main]
 async fn main() {
-    env_logger::init_from_env(Env::default().default_filter_or(LOGGING_FILTER));
+    pretty_env_logger::formatted_builder().parse_filters(LOGGING_FILTER).init();
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from((IP_ADDRESS, PORT));
 
     let service = make_service_fn(|_conn| async {
         let svc = ServiceBuilder::new().service(service_fn(test_handle));
@@ -22,7 +24,7 @@ async fn main() {
 
     let server = Server::bind(&addr).serve(service);
 
-    log::trace!("Server initialized");
+    log::info!("Listening on port: {}", PORT);
 
     if let Err(e) = server.await {
         eprintln!("Server error: {}", e)
