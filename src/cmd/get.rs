@@ -1,6 +1,9 @@
+use bytes::Bytes;
+use serde::{Serialize, Deserialize};
 use crate::cmd::CommandOpts;
-use crate::data::Origin;
+use crate::data::{Data, DataController, Origin};
 
+#[derive(Serialize, Deserialize)]
 pub struct Get {
     origin: Origin,
     route: &'static str,
@@ -41,6 +44,13 @@ impl Get {
 
     pub fn route(&self) -> &str {
         self.route
+    }
+
+    pub fn into_data(self) -> Data {
+        let mut data = Data::array();
+        data.push_bulk(Bytes::from("get".as_bytes()));
+        data.push_bulk(Bytes::from(serde_json::to_string(&self).unwrap()));
+        data
     }
 }
 

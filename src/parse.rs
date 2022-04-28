@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-
 use async_trait::async_trait;
 use select::predicate::{Name, Predicate};
-
+use std::path::PathBuf;
+use crate::data::{Data, DataChunk};
 use crate::error::{Error, ErrorKind};
 use crate::html::{Headers, HtmlAttribute, HtmlDocument, HtmlParser, HtmlTag};
 use crate::utils::Result;

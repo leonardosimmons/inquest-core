@@ -1,8 +1,10 @@
 pub mod get;
 use get::Get;
 
-use crate::data::Data;
+use serde::{Serialize, Deserialize};
+use std::fmt::{Display, Formatter};
 
+#[derive(Serialize, Deserialize)]
 pub struct CommandOpts {
     tags: Option<Vec<String>>
 }
@@ -24,5 +26,13 @@ impl CommandOpts {
 impl Default for CommandOpts {
     fn default() -> Self {
         CommandOpts::new()
+    }
+}
+
+impl Display for Command {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::Get(get) => write!(f, "Get: {}", serde_json::to_string(get).unwrap()),
+        }
     }
 }
