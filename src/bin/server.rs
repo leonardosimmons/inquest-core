@@ -1,10 +1,11 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
-use pretty_env_logger;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tower::ServiceBuilder;
+use tracing::Level;
+use tracing_subscriber::{self, EnvFilter};
 
 const IP_ADDRESS: [u8; 4] = [127, 0, 0, 1];
 const LOGGING_FILTER: &str = "server=trace";
@@ -13,7 +14,10 @@ const TEST_HANDLE_DURATION: u64 = 2;
 
 #[tokio::main]
 async fn main() {
-    pretty_env_logger::formatted_builder().parse_filters(LOGGING_FILTER).init();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .with_env_filter(EnvFilter::from(LOGGING_FILTER))
+        .init();
 
     let addr = SocketAddr::from((IP_ADDRESS, PORT));
 
@@ -24,7 +28,7 @@ async fn main() {
 
     let server = Server::bind(&addr).serve(service);
 
-    log::info!("Listening on port: {}", PORT);
+    tracing::info!("Listening on port: {}", PORT);
 
     if let Err(e) = server.await {
         eprintln!("Server error: {}", e)
@@ -33,6 +37,6 @@ async fn main() {
 
 async fn test_handle(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
     tokio::time::sleep(Duration::from_secs(TEST_HANDLE_DURATION)).await;
-    log::trace!("test_handle fired");
+    tracing::trace!("test_handle fired");
     Ok(Response::new(Body::from("Hello Portland")))
 }

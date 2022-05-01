@@ -1,12 +1,7 @@
-#![allow(unused)]
-use std::borrow::Borrow;
 use std::ops::Deref;
 use std::path::PathBuf;
-
 use structopt::StructOpt;
-use crate::error::{Error, ErrorKind};
-
-use crate::utils::Result;
+use tracing::{event, Level};
 
 #[derive(StructOpt, Clone, Debug)]
 pub struct HtmlParseOpts {
@@ -57,6 +52,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn init() -> Cli {
+        event!(Level::DEBUG, "cli initialized");
         Cli::from_args()
     }
 

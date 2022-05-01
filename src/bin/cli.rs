@@ -2,11 +2,13 @@ use inquest::cli::{Cli, HtmlOpts};
 use inquest::probe::Probe;
 use pretty_env_logger;
 
-const LOGGING_FILTER: &str = "client=trace";
+const LOGGING_FILTER: &str = "inquest=trace";
 
 #[tokio::main]
 async fn main() {
-    pretty_env_logger::formatted_builder().parse_filters(LOGGING_FILTER).init();
+    pretty_env_logger::formatted_builder()
+        .parse_filters(LOGGING_FILTER)
+        .init();
 
     let cli = Cli::init();
 
@@ -20,14 +22,15 @@ async fn main() {
                 match probe.from("tests/test.html").await {
                     Ok(probe) => {
                         if let Ok(links) = probe.all_links() {
-                            links.iter().for_each(|link| println!("{}", link));
+                            links.iter().for_each(|link| {
+                                println!("Link: {}", link)
+                            });
                         } else {
                             eprintln!("error: failed to retrieve descriptions");
                         }
                     }
                     Err(err) => eprintln!("error: {}", err.to_string()),
                 }
-
             }
         },
         _ => eprintln!("unimplemented"),
