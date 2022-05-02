@@ -1,12 +1,14 @@
+#![allow(unused)]
+use crate::error::{Error, ErrorKind};
+use crate::parse::Parse;
+use crate::utils::Result;
 use atoi::atoi;
 use bytes::{Buf, Bytes};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::io::Cursor;
+use std::str::FromStr;
 use std::vec;
-use crate::error::{Error, ErrorKind};
-use crate::parse::Parse;
-use crate::utils::Result;
 
 pub(crate) trait ByteController {
     /// Returns first byte in the buffer
@@ -32,7 +34,7 @@ pub(crate) trait DataController {
 
 pub(crate) trait DataParser {
     /// Returns a data parser
-    fn into_parts(self, data: Data) -> Result<Parse<DataChunk>>;
+    fn into_parts(self, data: Data) -> Result<DataChunk>;
     /// Returns the next entry in the data array
     fn next(&mut self) -> Result<Data>;
     /// Returns the next entry in the data array as `Bytes`
@@ -45,17 +47,29 @@ pub(crate) trait DataParser {
     fn finish(&mut self) -> Result<()>;
 }
 
+/// The type for which the data should be parsed as
 pub enum DataType {
     Html,
     Text,
 }
 
+/// Origin of data source
+///
+/// `Byte representation`:
+///
+/// % = file system
+///
+/// @ = http
+///
+/// & = internal
 #[derive(Serialize, Deserialize)]
 pub enum Origin {
+    FileSystem,
     Http,
-    Path,
+    Internal,
 }
 
+/// Base `Data Structure` for application.
 pub enum Data {
     Array(Vec<Data>),
     Bulk(Bytes),
@@ -65,22 +79,28 @@ pub enum Data {
     Simple(String),
 }
 
+/// Data::Array broken into individual elements
 pub struct DataChunk {
-    parts: vec::IntoIter<Data>
+    parts: vec::IntoIter<Data>,
 }
 
 impl From<Data> for DataChunk {
     fn from(data: Data) -> Self {
         match data {
             Data::Array(d) => d.into(),
-            data => panic!("protocol error; expecting a `Data::Array`, instead got {}", data)
+            data => panic!(
+                "protocol error; expecting a `Data::Array`, instead got {}",
+                data
+            ),
         }
     }
 }
 
 impl From<Vec<Data>> for DataChunk {
     fn from(data: Vec<Data>) -> Self {
-        Self { parts: data.into_iter() }
+        Self {
+            parts: data.into_iter(),
+        }
     }
 }
 
@@ -99,6 +119,18 @@ impl ByteController for Data {
         Ok(src.get_u8())
     }
 
+    fn skip_buffer(src: &mut Cursor<&[u8]>, n: usize) -> Result<()> {
+        if !src.has_remaining() {
+            return Err(Error::from(ErrorKind::Unknown));
+        }
+        Ok(src.advance(n))
+    }
+
+    fn read_newline_decimal(src: &mut Cursor<&[u8]>) -> Result<u64> {
+        let line = Data::read_bytes_line(src)?;
+        atoi::<u64>(line).ok_or_else(|| Error::from(ErrorKind::Parse))
+    }
+
     fn read_bytes_line<'a>(src: &mut Cursor<&'a [u8]>) -> Result<&'a [u8]> {
         let start = src.position() as usize;
         let end = src.get_ref().len() - 1;
@@ -111,18 +143,6 @@ impl ByteController for Data {
         }
 
         Err(Error::from(ErrorKind::Parse))
-    }
-
-    fn read_newline_decimal(src: &mut Cursor<&[u8]>) -> Result<u64> {
-        let line = Data::read_bytes_line(src)?;
-        atoi::<u64>(line).ok_or_else(|| Error::from(ErrorKind::Parse))
-    }
-
-    fn skip_buffer(src: &mut Cursor<&[u8]>, n: usize) -> Result<()> {
-        if !src.has_remaining() {
-            return Err(Error::from(ErrorKind::Unknown));
-        }
-        Ok(src.advance(n))
     }
 }
 
@@ -147,7 +167,7 @@ impl DataController for Data {
 }
 
 impl Display for Data {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         use std::str;
 
         match self {
@@ -185,8 +205,22 @@ impl Display for DataType {
 impl Display for Origin {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
+            Origin::FileSystem => write!(f, "file"),
             Origin::Http => write!(f, "http"),
-            Origin::Path => write!(f, "path"),
+            Origin::Internal => write!(f, "internal"),
+        }
+    }
+}
+
+impl FromStr for Origin {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::prelude::rust_2015::Result<Self, Self::Err> {
+        match s {
+            "%" => Ok(Origin::FileSystem),
+            "@" => Ok(Origin::Http),
+            "&" => Ok(Origin::Internal),
+            _ => Err(Error::from(ErrorKind::Parse)),
         }
     }
 }
@@ -213,8 +247,9 @@ impl PartialEq<&str> for DataType {
 impl PartialEq<&str> for Origin {
     fn eq(&self, other: &&str) -> bool {
         match self {
+            Origin::FileSystem => "path".eq(*other),
             Origin::Http => "http".eq(*other),
-            Origin::Path => "path".eq(*other),
+            Origin::Internal => "internal".eq(*other),
         }
     }
 }

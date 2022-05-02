@@ -1,3 +1,4 @@
+#![allow(unused)]
 pub mod get;
 use get::Get;
 
@@ -9,6 +10,11 @@ pub struct CommandOpts {
     tags: Option<Vec<String>>
 }
 
+/// `Commands` issued by system
+///
+/// `Data::Array` should contain all the elements of the command
+/// - [element one] - `Origin`
+/// - [element two] - Serialized `Command`
 pub enum Command {
     Get(Get)
 }

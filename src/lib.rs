@@ -1,12 +1,13 @@
 pub mod cli;
-pub mod cmd;
-pub mod data;
 pub mod error;
 pub mod file;
-pub mod probe;
-
 pub mod html;
-pub mod parse;
+pub mod logging;
+pub mod probe;
+pub mod service;
+pub mod utils;
 
-
-pub(crate) mod utils;
+pub(crate) mod cmd;
+pub(crate) mod data;
+pub(crate) mod parse;
+pub(crate) mod system;

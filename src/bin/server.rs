@@ -1,3 +1,4 @@
+#![allow(unused)]
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use std::convert::Infallible;
@@ -5,7 +6,6 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tracing::Level;
-use tracing_subscriber::{self, EnvFilter};
 
 const IP_ADDRESS: [u8; 4] = [127, 0, 0, 1];
 const LOGGING_FILTER: &str = "server=trace";
@@ -14,11 +14,6 @@ const TEST_HANDLE_DURATION: u64 = 2;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::TRACE)
-        .with_env_filter(EnvFilter::from(LOGGING_FILTER))
-        .init();
-
     let addr = SocketAddr::from((IP_ADDRESS, PORT));
 
     let service = make_service_fn(|_conn| async {

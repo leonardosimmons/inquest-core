@@ -1,7 +1,8 @@
-use bytes::Bytes;
-use serde::{Serialize, Deserialize};
+#![allow(unused)]
 use crate::cmd::CommandOpts;
 use crate::data::{Data, DataController, Origin};
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Get {
@@ -13,7 +14,7 @@ pub struct Get {
 impl Get {
     pub fn new() -> Self {
         Self {
-            origin: Origin::Path,
+            origin: Origin::FileSystem,
             route: "",
             opts: None,
         }
@@ -23,14 +24,15 @@ impl Get {
         Self {
             origin: self.origin,
             route: self.route,
-            opts: Some(options)
+            opts: Some(options),
         }
     }
 
     pub fn set(self, origin: Origin, route: &'static str) -> Self {
         Self {
             opts: self.opts,
-            origin, route,
+            origin,
+            route,
         }
     }
 

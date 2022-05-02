@@ -91,6 +91,12 @@ impl Error {
     }
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.repr.to_string())
+    }
+}
+
 impl From<ErrorKind> for Error {
     #[inline]
     fn from(kind: ErrorKind) -> Self {
