@@ -1,38 +1,38 @@
-use inquest::cli::{Cli, HtmlOpts};
-use inquest::probe::Probe;
-use pretty_env_logger;
-
-const LOGGING_FILTER: &str = "inquest=trace";
+#![allow(unused)]
+use hyper::service::{make_service_fn, service_fn};
+use inquest::cli::Cli;
+use inquest::error::Error;
+use inquest::logging::LoggingLayer;
+use inquest::service::Service;
+use inquest::system::System;
+use std::convert::Infallible;
+use std::time::Duration;
+use tower::ServiceBuilder;
+use tracing::Level;
+use tracing_subscriber;
 
 #[tokio::main]
 async fn main() {
-    pretty_env_logger::formatted_builder()
-        .parse_filters(LOGGING_FILTER)
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .compact()
         .init();
 
     let cli = Cli::init();
-
-    match cli.command() {
-        HtmlOpts::Links(opts) => match opts.tags {
-            Some(_tags) => {
-                // implement -t flag -> filters links based on provided predicate(s)
-            }
-            None => {
-                let probe = Probe::new().document().buffer(4096).html();
-                match probe.from("tests/test.html").await {
-                    Ok(probe) => {
-                        if let Ok(links) = probe.all_links() {
-                            links.iter().for_each(|link| {
-                                println!("Link: {}", link)
-                            });
-                        } else {
-                            eprintln!("error: failed to retrieve descriptions");
-                        }
-                    }
-                    Err(err) => eprintln!("error: {}", err.to_string()),
-                }
-            }
-        },
-        _ => eprintln!("unimplemented"),
-    }
 }
+
+// async fn handle<S>(req: Request<S>) -> Result<Response, Error> {
+//     tokio::time::sleep(Duration::from_secs(1)).await;
+//     Ok::<_, Error>(Response::new(req.cli()))
+// }
+// let service = Service::create(move |req: Request| async move {
+//     tokio::time::sleep(Duration::from_secs(1)).await;
+//     Ok::<_, Error>(Response::new(req.cli()))
+// });
+
+// let service = Service::create(move |req: Request| async move {
+// let middleware = ServiceBuilder::new()
+// .layer(LoggingLayer::new())
+// .service(Service::create(handle));
+// Ok::<_, Error>(Response::new())
+// });

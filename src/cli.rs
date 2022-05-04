@@ -1,39 +1,39 @@
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::{event, Level};
+use crate::logging::CLI;
 
 #[derive(StructOpt, Clone, Debug)]
 pub struct HtmlParseOpts {
-    #[structopt(short, long)]
     /// Filter based on HTML tag
-    pub tags: Option<Vec<String>>,
-
-    #[structopt(parse(from_os_str), short, long)]
-    /// File paths to be probed
-    pub paths: Option<Vec<PathBuf>>,
-
     #[structopt(short, long)]
+    pub tags: Option<Vec<String>>,
+    /// File paths to be probed
+    #[structopt(parse(from_os_str), short, long)]
+    pub paths: Option<Vec<PathBuf>>,
     /// Urls to be probed
+    #[structopt(short, long)]
     pub urls: Option<Vec<String>>,
 }
 
 #[derive(StructOpt, Clone, Debug)]
 pub enum HtmlOpts {
-    #[structopt(name = "desc")]
     /// Returns the meta description
+    #[structopt(name = "desc")]
     Description(HtmlParseOpts),
-    #[structopt(name = "headers")]
     /// Returns the specified headers
+    #[structopt(name = "headers")]
     Headers(HtmlParseOpts),
-    #[structopt(name = "links")]
     /// Returns the specified links
+    #[structopt(name = "links")]
     Links(HtmlParseOpts),
-    #[structopt(name = "title")]
     /// Returns the title of the page
+    #[structopt(name = "title")]
     PageTitle(HtmlParseOpts),
     /// Error Value
-    NotSelected
+    NotSelected,
 }
 
 #[derive(StructOpt, Clone, Debug)]
@@ -43,7 +43,7 @@ pub enum CommandOpts {
     Probe(HtmlOpts),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Clone, Debug)]
 pub struct Cli {
     #[structopt(subcommand)]
     /// System Command Options
@@ -51,20 +51,23 @@ pub struct Cli {
 }
 
 impl Cli {
+    /// Instantiates CLI and returns command line arguments
     pub fn init() -> Cli {
-        event!(Level::DEBUG, "cli initialized");
+        event!(target: CLI, Level::DEBUG, "cli initialized");
         Cli::from_args()
     }
 
-    pub fn command(self) -> HtmlOpts {
+    /// Returns command selected by user via the cli
+    pub(crate) fn command(self) -> HtmlOpts {
         match self.cmd {
             Some(cmd) => match cmd {
                 CommandOpts::Probe(opts) => opts,
-            }
-            None => HtmlOpts::NotSelected
+            },
+            None => HtmlOpts::NotSelected,
         }
     }
 }
+
 impl Deref for Cli {
     type Target = CommandOpts;
 

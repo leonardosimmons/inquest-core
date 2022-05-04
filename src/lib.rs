@@ -5,9 +5,9 @@ pub mod html;
 pub mod logging;
 pub mod probe;
 pub mod service;
+pub mod system;
 pub mod utils;
 
 pub(crate) mod cmd;
 pub(crate) mod data;
 pub(crate) mod parse;
-pub(crate) mod system;
