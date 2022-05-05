@@ -19,21 +19,5 @@ async fn main() {
         .init();
 
     let cli = Cli::init();
-    System::<_, Initialized>::init(cli);
+    let system = System::init(cli);
 }
-
-// async fn handle<S>(req: Request<S>) -> Result<Response, Error> {
-//     tokio::time::sleep(Duration::from_secs(1)).await;
-//     Ok::<_, Error>(Response::new(req.cli()))
-// }
-// let service = Service::create(move |req: Request| async move {
-//     tokio::time::sleep(Duration::from_secs(1)).await;
-//     Ok::<_, Error>(Response::new(req.cli()))
-// });
-
-// let service = Service::create(move |req: Request| async move {
-// let middleware = ServiceBuilder::new()
-// .layer(LoggingLayer::new())
-// .service(Service::create(handle));
-// Ok::<_, Error>(Response::new())
-// });
