@@ -1,9 +1,18 @@
-use std::fmt::Debug;
+#![allow(unused)]
+use crate::error::Error;
+use crate::logging::CLI;
+use futures::future::{self, Future};
+use pin_project::pin_project;
+use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use hyper::Body;
 use structopt::StructOpt;
-use tracing::{event, Level};
-use crate::logging::CLI;
+use tower::Service;
+use tracing::{event, trace, Level};
+use crate::service::{Request, Response};
 
 #[derive(StructOpt, Clone, Debug)]
 pub struct HtmlParseOpts {
@@ -68,10 +77,33 @@ impl Cli {
     }
 }
 
-impl Deref for Cli {
-    type Target = CommandOpts;
+impl Service<Cli> for Cli
+{
+    type Response = Response<Cli, HtmlOpts>;
+    type Error = Error;
+    type Future = future::Ready<Result<Self::Response, Self::Error>>;
 
-    fn deref(&self) -> &Self::Target {
-        self.cmd.as_ref().unwrap()
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Cli) -> Self::Future {
+        let cli = req.clone();
+        let command = req.command();
+        future::ready(Ok(Response::new(cli, command)))
+    }
+}
+
+impl Service<Request<Cli, HtmlOpts>> for HtmlOpts {
+    type Response = Option<Vec<String>>;
+    type Error = Error;
+    type Future = future::Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, _req: Request<Cli, HtmlOpts>) -> Self::Future {
+        future::ready(Ok(Some(vec!["Test".to_string(), "Vec".to_string()])))
     }
 }

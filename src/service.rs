@@ -8,15 +8,52 @@ const APP: &str = "app";
 const CLI: &str = "cli";
 const SYSTEM: &str = "system";
 
-#[derive(Debug)]
-pub struct Request<Body> {
-    body: Body
-}
+ pub trait IntoRequest {
+     fn into_request<S, B>(self) -> Request<S, B>;
+ }
+ pub trait IntoResponse {
+     fn into_request<S, B>(self) -> Response<S, B>;
+ }
 
 #[derive(Debug)]
-pub struct Response {
-    message: String,
-}
+ pub struct Request<S, B> {
+     inner: S,
+     body: B,
+ }
+
+#[derive(Debug)]
+ pub struct Response<S, B> {
+     inner: S,
+     body: B
+ }
+
+ impl<S, B> Request<S, B> {
+     pub fn new(inner: S, body: B) -> Request<S, B> {
+         Self { inner, body }
+     }
+
+     pub fn inner(&self) -> &S {
+         &self.inner
+     }
+
+     pub fn body(&self) -> &B {
+         &self.body
+     }
+ }
+
+ impl<S, B> Response<S, B> {
+     pub fn new(inner: S, body: B) -> Response<S, B> {
+         Self { inner, body }
+     }
+
+     pub fn inner(&self) -> &S {
+         &self.inner
+     }
+
+     pub fn body(&self) -> &B {
+         &self.body
+     }
+ }
 
 #[derive(Debug)]
 pub struct Service<F> {
@@ -25,24 +62,6 @@ pub struct Service<F> {
 
 pub struct Factory<F> {
     f: Vec<F>
-}
-
-// === impl Request ===
-
-impl<Body> Request<Body> {
-    pub fn new(body: Body) -> Request<Body> {
-        Request { body }
-    }
-}
-
-// === impl Response ===
-
-impl Response {
-    pub fn new(message: impl ToString) -> Response {
-        Response {
-            message: message.to_string(),
-        }
-    }
 }
 
 // === impl Service ===
@@ -77,5 +96,3 @@ where
         (self.f)(req)
     }
 }
-
-// === impl Factory ===

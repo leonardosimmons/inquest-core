@@ -3,13 +3,13 @@ use hyper::service::{make_service_fn, service_fn};
 use inquest::cli::Cli;
 use inquest::error::Error;
 use inquest::logging::LoggingLayer;
-use inquest::service::Service;
-use inquest::system::System;
+use inquest::service::{Request, Service};
 use std::convert::Infallible;
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tracing::Level;
 use tracing_subscriber;
+use inquest::system::{Initialized, System};
 
 #[tokio::main]
 async fn main() {
@@ -19,6 +19,7 @@ async fn main() {
         .init();
 
     let cli = Cli::init();
+    System::<_, Initialized>::init(cli);
 }
 
 // async fn handle<S>(req: Request<S>) -> Result<Response, Error> {

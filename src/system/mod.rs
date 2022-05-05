@@ -1,64 +1,58 @@
 #![allow(unused)]
+use crate::cli::Cli;
 use crate::logging::{APP, SYSTEM};
 use std::fmt::{Debug, Display};
+use hyper::Body;
 use tower::{Service, ServiceExt};
-use tracing::{event, span};
 use tracing::Level;
-use crate::cli::Cli;
-
-pub trait IntoRequest {
-    fn into_request<Req>(self) -> Request<Req>;
-}
-pub trait IntoResponse{
-    fn into_request<Req>(self) -> Response<Req>;
-}
-
-struct Request<Req> {
-    inner: Req
-}
-
-struct Response<Req> {
-    inner: Req
-}
+use tracing::{event, span};
+use crate::service::{Request, Response};
 
 pub struct Initialized;
 
 pub struct System<App, S> {
     app: App,
-    state: S
+    state: S,
 }
 
 impl<App, State> System<App, State>
-where
-    App: Service<Request<Req>, Response = impl IntoResponse>,
-    App::Error: Debug + Display,
-    App::Future: Send + 'static + Debug,
 {
-    pub fn init(app: App) -> System<App, Initialized>
+    pub fn init<S, B>(app: App) -> System<App, Initialized>
+        where
+            App: Service<S, Response = Response<S, B>>,
+            B: Send + 'static,
+            App::Error: Debug + Display,
+            App::Future: Send + 'static + Debug,
     {
         let span = span!(Level::TRACE, APP);
         let _enter = span.enter();
         event!(target: SYSTEM, Level::DEBUG, "application initialized");
         System {
             app,
-            state: Initialized
+            state: Initialized,
         }
     }
 }
 
-impl System<Cli, Initialized> {
-    pub async fn run(mut self)
+impl<App, State> System<App, State>
+{
+    pub async fn run<Req, Res>(mut self, middleware: Req)
+    where
+        App: Service<Req, Response = Res>,
+        Res: Debug,
+        App::Error: Debug + Display,
+        App::Future: Send + 'static + Debug
     {
         loop {
             let app = match self.app.ready().await {
                 Err(err) => {
-                    event!(target: SYSTEM, Level::WARN, "system is busy: {}", err);
+                    event!(target: SYSTEM, Level::WARN, "system is busy");
                     continue;
                 }
-                Ok(app) => app
+                Ok(app) => app,
             };
 
-            let fut = app.call(self.app);
+            let fut = app.call(middleware);
             event!(target: SYSTEM, Level::DEBUG, "received new task");
 
             let handle = tokio::spawn(async move {
@@ -68,7 +62,6 @@ impl System<Cli, Initialized> {
                 }
             });
 
-            // TEMP
             if let Ok(_) = handle.await {
                 event!(target: SYSTEM, Level::DEBUG, "request complete");
                 break;
@@ -80,4 +73,3 @@ impl System<Cli, Initialized> {
         event!(target: SYSTEM, Level::DEBUG, "shutdown");
     }
 }
-
