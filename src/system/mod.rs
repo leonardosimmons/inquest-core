@@ -22,7 +22,7 @@ impl<App> System<App> {
     }
 
     /// Runs specified request through current service
-    pub async fn run<Req, Res, T, B>(mut self, req: Req)
+    pub async fn run<Req, Res, T, B>(mut self, request: Req)
     where
         App: Service<Req, Response = Res>,
         Req: IntoRequest<T>,
@@ -40,7 +40,7 @@ impl<App> System<App> {
             };
 
             event!(target: SYSTEM, Level::DEBUG, "received new request");
-            let fut = app.call(req);
+            let fut = app.call(request);
 
             let handle = tokio::spawn(async move {
                 match fut.await {
