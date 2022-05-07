@@ -1,15 +1,8 @@
-#![allow(unused)]
-use hyper::service::{make_service_fn, service_fn};
-use inquest::cli::Cli;
-use inquest::error::Error;
-use inquest::logging::LoggingLayer;
-use inquest::service::{Request, Service};
-use std::convert::Infallible;
-use std::time::Duration;
-use tower::ServiceBuilder;
+use inquest::cli::{Cli, CliService, HtmlOptsService};
+use inquest::service::Request;
+use inquest::system::System;
 use tracing::Level;
 use tracing_subscriber;
-use inquest::system::{Initialized, System};
 
 #[tokio::main]
 async fn main() {
@@ -19,5 +12,9 @@ async fn main() {
         .init();
 
     let cli = Cli::init();
-    let system = System::init(cli);
+
+    let app = CliService::new(HtmlOptsService::new());
+    let req = Request::new(cli);
+
+    System::run(app, req).await;
 }
