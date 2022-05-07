@@ -1,6 +1,8 @@
-use inquest::cli::{Cli, CliService, HtmlOptsService};
-use inquest::service::Request;
+use inquest::cli::{Cli, CliLayer, HtmlOptsLayer};
+use inquest::error::Error;
+use inquest::service::{Request, Response};
 use inquest::system::System;
+use tower::ServiceBuilder;
 use tracing::Level;
 use tracing_subscriber;
 
@@ -12,9 +14,12 @@ async fn main() {
         .init();
 
     let cli = Cli::init();
-
-    let app = CliService::new(HtmlOptsService::new());
     let req = Request::new(cli);
 
-    System::bind(app).run(req).await;
+    let cli = ServiceBuilder::new()
+        .layer(CliLayer::new())
+        .layer(HtmlOptsLayer::new())
+        .service_fn(|req: Cli| Ok::<_, Error>(Response::new(req)));
+
+    System::bind(cli).run(req).await;
 }

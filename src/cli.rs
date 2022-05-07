@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use structopt::StructOpt;
-use tower::Service;
+use tower::{Layer, Service};
 use tracing::{event, Level};
 
 #[derive(StructOpt, Clone, Debug)]
@@ -67,13 +67,17 @@ pub struct CliServiceFuture<F> {
     future: F,
 }
 
+pub struct CliLayer;
+
 pub struct HtmlOptsService;
 
 #[pin_project]
 pub struct HtmlOptsServiceFuture<F> {
     #[pin]
-    future: F
+    future: F,
 }
+
+pub struct HtmlOptsLayer;
 
 // === impl Cli ===
 
@@ -159,6 +163,27 @@ where
     }
 }
 
+// === impl CliLayer ===
+
+impl CliLayer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<S, B> Layer<S> for CliLayer
+where
+    S: Service<Request<Cli>, Response = Response<B>> + Send + 'static,
+    S::Error: Debug + Display,
+    S::Future: Send + 'static,
+{
+    type Service = CliService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        CliService::new(inner)
+    }
+}
+
 // === impl HtmlOptsService ===
 
 impl HtmlOptsService {
@@ -180,5 +205,21 @@ impl Service<Request<Cli>> for HtmlOptsService {
         let cli = req.body().clone();
         let opts = cli.command();
         future::ready(Ok(Response::new(opts)))
+    }
+}
+
+// === impl HtmlOptsLayer ===
+
+impl HtmlOptsLayer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<S> Layer<S> for HtmlOptsLayer {
+    type Service = HtmlOptsService;
+
+    fn layer(&self, _inner: S) -> Self::Service {
+        HtmlOptsService::new()
     }
 }
