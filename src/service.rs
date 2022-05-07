@@ -9,31 +9,25 @@ const CLI: &str = "cli";
 const SYSTEM: &str = "system";
 
  pub trait IntoRequest {
-     fn into_request<S, B>(self) -> Request<S, B>;
+     fn into_request<B>(self) -> Request<B>;
  }
  pub trait IntoResponse {
-     fn into_request<S, B>(self) -> Response<S, B>;
+     fn into_request<B>(self) -> Response<B>;
  }
 
 #[derive(Debug)]
- pub struct Request<S, B> {
-     inner: S,
+ pub struct Request<B> {
      body: B,
  }
 
 #[derive(Debug)]
- pub struct Response<S, B> {
-     inner: S,
+ pub struct Response<B> {
      body: B
  }
 
- impl<S, B> Request<S, B> {
-     pub fn new(inner: S, body: B) -> Request<S, B> {
-         Self { inner, body }
-     }
-
-     pub fn inner(&self) -> &S {
-         &self.inner
+ impl<B> Request<B> {
+     pub fn new(body: B) -> Request<B> {
+         Self { body }
      }
 
      pub fn body(&self) -> &B {
@@ -41,13 +35,9 @@ const SYSTEM: &str = "system";
      }
  }
 
- impl<S, B> Response<S, B> {
-     pub fn new(inner: S, body: B) -> Response<S, B> {
-         Self { inner, body }
-     }
-
-     pub fn inner(&self) -> &S {
-         &self.inner
+ impl<B> Response<B> {
+     pub fn new(body: B) -> Response<B> {
+         Self { body }
      }
 
      pub fn body(&self) -> &B {
