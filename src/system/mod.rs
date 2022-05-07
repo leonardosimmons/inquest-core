@@ -1,23 +1,39 @@
 use crate::logging::SYSTEM;
-use crate::service::Response;
+use crate::service::{IntoRequest, IntoResponse};
 use std::fmt::{Debug, Display};
 use tower::{Service, ServiceExt};
 use tracing::{event, Level};
 
-pub struct System;
+pub struct System<App> {
+    app: App
+}
 
-impl System {
-    pub async fn run<App, Req, B>(mut app: App, req: Req)
+impl<App> System<App> {
+    /// Binds service to the current application executor
+    pub fn bind<Req, Res, T, B>(app: App) -> Self
     where
-        App: Service<Req, Response = Response<B>>,
-        B: Debug,
+        App: Service<Req, Response = Res>,
+        Req: IntoRequest<T>,
+        Res: IntoResponse<B> + Debug,
+        App::Error: Debug + Display,
+        App::Future: Send + 'static
+    {
+        Self { app }
+    }
+
+    /// Runs specified request through current service
+    pub async fn run<Req, Res, T, B>(mut self, req: Req)
+    where
+        App: Service<Req, Response = Res>,
+        Req: IntoRequest<T>,
+        Res: IntoResponse<B> + Debug,
         App::Error: Debug + Display,
         App::Future: Send + 'static
     {
         loop {
-            let app = match app.ready().await {
-                Err(err) => {
-                    event!(target: SYSTEM, Level::WARN, "system is busy; {}", err);
+            let app = match self.app.ready().await {
+                Err(_err) => {
+                    event!(target: SYSTEM, Level::WARN, "system is busy...");
                     continue;
                 }
                 Ok(app) => app,

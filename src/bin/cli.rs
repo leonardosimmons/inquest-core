@@ -16,5 +16,5 @@ async fn main() {
     let app = CliService::new(HtmlOptsService::new());
     let req = Request::new(cli);
 
-    System::run(app, req).await;
+    System::bind(app).run(req).await;
 }
