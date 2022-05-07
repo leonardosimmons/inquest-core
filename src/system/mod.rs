@@ -1,40 +1,20 @@
-use crate::cli::Cli;
-use crate::logging::{APP, SYSTEM};
+use crate::logging::SYSTEM;
 use crate::service::Response;
 use std::fmt::{Debug, Display};
 use tower::{Service, ServiceExt};
-use tracing::Level;
-use tracing::{event, span};
+use tracing::{event, Level};
 
-pub struct Initialized<App> {
-    app: App,
-}
+pub struct System;
 
-pub struct System<State> {
-    state: State,
-}
-
-impl<App> System<Initialized<App>> {
-    pub fn init<S, B>(app: App) -> System<Initialized<App>>
+impl System {
+    pub async fn run<App, Req, B>(mut app: App, req: Req)
     where
-        App: Service<S, Response = Response<S, B>>,
-        B: Send + 'static,
+        App: Service<Req, Response = Response<B>>,
+        B: Debug,
         App::Error: Debug + Display,
-        App::Future: Send + 'static + Debug,
+        App::Future: Send + 'static
     {
-        let span = span!(Level::TRACE, APP);
-        let _enter = span.enter();
-        event!(target: SYSTEM, Level::DEBUG, "application initialized");
-        System {
-            state: Initialized { app },
-        }
-    }
-}
-
-impl System<Initialized<Cli>> {
-    pub async fn run(self) {
         loop {
-            let mut app = self.state.app.clone();
             let app = match app.ready().await {
                 Err(err) => {
                     event!(target: SYSTEM, Level::WARN, "system is busy; {}", err);
@@ -44,7 +24,7 @@ impl System<Initialized<Cli>> {
             };
 
             event!(target: SYSTEM, Level::DEBUG, "received new request");
-            let fut = app.call(app.clone());
+            let fut = app.call(req);
 
             let handle = tokio::spawn(async move {
                 match fut.await {
