@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::error::Error;
 use crate::utils::Result;
 use std::future::Future;
@@ -8,11 +7,11 @@ const APP: &str = "app";
 const CLI: &str = "cli";
 const SYSTEM: &str = "system";
 
- pub trait IntoRequest {
-     fn into_request<B>(self) -> Request<B>;
+ pub trait IntoRequest<B> {
+     fn into_request(self) -> Request<B>;
  }
- pub trait IntoResponse {
-     fn into_request<B>(self) -> Response<B>;
+ pub trait IntoResponse<B> {
+     fn into_response(self) -> Response<B>;
  }
 
 #[derive(Debug)]
@@ -25,33 +24,45 @@ const SYSTEM: &str = "system";
      body: B
  }
 
- impl<B> Request<B> {
-     pub fn new(body: B) -> Request<B> {
-         Self { body }
-     }
-
-     pub fn body(&self) -> &B {
-         &self.body
-     }
- }
-
- impl<B> Response<B> {
-     pub fn new(body: B) -> Response<B> {
-         Self { body }
-     }
-
-     pub fn body(&self) -> &B {
-         &self.body
-     }
- }
-
 #[derive(Debug)]
 pub struct Service<F> {
     f: F,
 }
 
-pub struct Factory<F> {
-    f: Vec<F>
+// === impl Request ===
+
+impl<B> Request<B> {
+    pub fn new(body: B) -> Request<B> {
+        Self { body }
+    }
+
+    pub fn body(&self) -> &B {
+        &self.body
+    }
+}
+
+impl<B> IntoRequest<B> for Request<B> {
+    fn into_request(self) -> Request<B> {
+        self
+    }
+}
+
+// === impl Response ===
+
+impl<B> Response<B> {
+    pub fn new(body: B) -> Response<B> {
+        Self { body }
+    }
+
+    pub fn body(&self) -> &B {
+        &self.body
+    }
+}
+
+impl<B> IntoResponse<B> for Response<B> {
+    fn into_response(self) -> Response<B> {
+        self
+    }
 }
 
 // === impl Service ===

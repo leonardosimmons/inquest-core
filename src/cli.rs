@@ -75,6 +75,8 @@ pub struct HtmlOptsServiceFuture<F> {
     future: F
 }
 
+// === impl Cli ===
+
 impl Cli {
     /// Instantiates CLI and returns command line arguments
     pub fn init() -> Cli {
@@ -93,6 +95,8 @@ impl Cli {
     }
 }
 
+// === impl CliService ===
+
 impl<S, B> CliService<S>
 where
     S: Service<Request<Cli>, Response = Response<B>> + Send + 'static,
@@ -101,12 +105,6 @@ where
 {
     pub fn new(inner: S) -> Self {
         Self { inner }
-    }
-}
-
-impl HtmlOptsService {
-    pub fn new() -> Self {
-        Self
     }
 }
 
@@ -158,6 +156,14 @@ where
             ),
         };
         Poll::Ready(res)
+    }
+}
+
+// === impl HtmlOptsService ===
+
+impl HtmlOptsService {
+    pub fn new() -> Self {
+        Self
     }
 }
 
