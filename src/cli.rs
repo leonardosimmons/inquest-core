@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::logging::CLI;
-use crate::service::{IntoRequest, Request, Response};
+use crate::service::{IntoRequest, IntoResponse, Request, Response};
 use futures::future;
 use pin_project::pin_project;
 use std::fmt::{Debug, Display};
@@ -134,6 +134,14 @@ impl Cli {
 impl IntoRequest<Cli> for Cli {
     fn into_request(self) -> Request<Cli> {
         Request::new(self)
+    }
+}
+
+// === impl CommandOpts ===
+
+impl IntoResponse<CommandOpts> for CommandOpts {
+    fn into_response(self) -> Response<CommandOpts> {
+        Response::new(self)
     }
 }
 

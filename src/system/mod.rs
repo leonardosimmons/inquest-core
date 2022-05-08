@@ -1,5 +1,5 @@
 use crate::logging::SYSTEM;
-use crate::service::{IntoRequest, Request};
+use crate::service::{IntoRequest, IntoResponse, Request, Response};
 use std::fmt::{Debug, Display};
 use tower::{Service, ServiceExt};
 use tracing::{event, Level};
@@ -22,11 +22,11 @@ impl<App> System<App> {
     }
 
     /// Runs specified request through current service
-    pub async fn run<T, Res>(mut self, request: T)
+    pub async fn run<T, B>(mut self, request: T)
     where
-        App: Service<Request<T>, Response = Res>,
+        App: Service<Request<T>, Response = Response<B>>,
         T: IntoRequest<T>,
-        Res: Debug,
+        B: IntoResponse<B> + Debug,
         App::Error: Debug + Display,
         App::Future: Send + 'static
     {
