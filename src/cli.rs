@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::logging::CLI;
-use crate::service::{Request, Response};
+use crate::service::{IntoRequest, Request, Response};
 use futures::future;
 use pin_project::pin_project;
 use std::fmt::{Debug, Display};
@@ -53,6 +53,8 @@ pub enum CommandOpts {
     NotSelected,
 }
 
+// === Cli ===
+
 #[derive(StructOpt, Clone, Debug)]
 pub struct Cli {
     /// System Command Options
@@ -72,6 +74,8 @@ struct CliServiceFuture<F> {
 
 struct CliLayer;
 
+// === Command ===
+
 struct CliCommand<S> {
     inner: S,
 }
@@ -82,6 +86,10 @@ struct CliCommandFuture<F> {
     future: F,
 }
 
+struct CommandLayer;
+
+// === Html Opts ===
+
 struct HtmlOptsService;
 
 #[pin_project]
@@ -89,8 +97,6 @@ struct HtmlOptsServiceFuture<F> {
     #[pin]
     future: F,
 }
-
-struct CommandLayer;
 
 struct HtmlOptsLayer;
 
@@ -104,7 +110,7 @@ impl Cli {
     }
 
     /// Returns command selected by user via the cli
-    pub(crate) fn command(self) -> CommandOpts {
+    fn command(self) -> CommandOpts {
         match self.cmd {
             Some(cmd) => cmd,
             None => CommandOpts::NotSelected,
@@ -113,7 +119,7 @@ impl Cli {
 
     /// Root Cli Service
     pub fn service() -> BoxService<Request<Cli>, Response<CommandOpts>, Error> {
-        let root = ServiceBuilder::new()
+        let srv = ServiceBuilder::new()
             .layer(CliLayer::new())
             .layer(CommandLayer::new())
             .service_fn(|req: Request<CommandOpts>| async move {
@@ -121,7 +127,13 @@ impl Cli {
                 let res = Response::new(req);
                 Ok::<_, Error>(res)
             });
-        BoxService::new(root)
+        BoxService::new(srv)
+    }
+}
+
+impl IntoRequest<Cli> for Cli {
+    fn into_request(self) -> Request<Cli> {
+        Request::new(self)
     }
 }
 
@@ -133,7 +145,7 @@ where
     S::Error: Debug + Display,
     S::Future: 'static + Send,
 {
-    pub fn new(inner: S) -> Self {
+    fn new(inner: S) -> Self {
         Self { inner }
     }
 }
@@ -211,7 +223,7 @@ where
 // === impl CliCommand ===
 
 impl<S> CliCommand<S> {
-    pub fn new(inner: S) -> Self {
+    fn new(inner: S) -> Self {
         Self { inner }
     }
 }
@@ -294,7 +306,7 @@ where
 // === impl HtmlOpts ===
 
 impl HtmlOptsService {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self
     }
 }
