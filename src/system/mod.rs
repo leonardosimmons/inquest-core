@@ -1,20 +1,20 @@
 use crate::logging::SYSTEM;
-use crate::service::{IntoRequest, IntoResponse};
+use crate::service::{IntoRequest, Request};
 use std::fmt::{Debug, Display};
 use tower::{Service, ServiceExt};
 use tracing::{event, Level};
 
+/// Runs and executes services
 pub struct System<App> {
     app: App
 }
 
 impl<App> System<App> {
     /// Binds service to the current application executor
-    pub fn bind<Req, Res, T, B>(app: App) -> Self
+    pub fn bind<Req, Res>(app: App) -> Self
     where
         App: Service<Req, Response = Res>,
-        Req: IntoRequest<T>,
-        Res: IntoResponse<B> + Debug,
+        Res: Debug,
         App::Error: Debug + Display,
         App::Future: Send + 'static
     {
@@ -22,11 +22,11 @@ impl<App> System<App> {
     }
 
     /// Runs specified request through current service
-    pub async fn run<Req, Res, T, B>(mut self, request: Req)
+    pub async fn run<T, Res>(mut self, request: T)
     where
-        App: Service<Req, Response = Res>,
-        Req: IntoRequest<T>,
-        Res: IntoResponse<B> + Debug,
+        App: Service<Request<T>, Response = Res>,
+        T: IntoRequest<T>,
+        Res: Debug,
         App::Error: Debug + Display,
         App::Future: Send + 'static
     {
@@ -40,7 +40,7 @@ impl<App> System<App> {
             };
 
             event!(target: SYSTEM, Level::DEBUG, "received new request");
-            let fut = app.call(request);
+            let fut = app.call(request.into_request());
 
             let handle = tokio::spawn(async move {
                 event!(target: SYSTEM, Level::DEBUG, "processing request...");
