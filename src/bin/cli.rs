@@ -1,4 +1,5 @@
-use inquest::cli::{Cli, CliLayer, HtmlOptsLayer};
+#![allow(unused)]
+use inquest::cli::{Cli, CliLayer, CommandLayer, HtmlOptsLayer};
 use inquest::error::Error;
 use inquest::service::{Request, Response};
 use inquest::system::System;
@@ -18,8 +19,9 @@ async fn main() {
 
     let cli = ServiceBuilder::new()
         .layer(CliLayer::new())
+        .layer(CommandLayer::new())
         .layer(HtmlOptsLayer::new())
-        .service_fn(|req: Cli| Ok::<_, Error>(Response::new(req)));
+        .service_fn(|request: Cli| Ok::<_, Error>(Response::new(request)));
 
     System::bind(cli).run(req).await;
 }

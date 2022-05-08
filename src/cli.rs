@@ -48,6 +48,8 @@ pub enum CommandOpts {
     /// Probes specified Html document
     #[structopt(name = "probe")]
     Probe(HtmlOpts),
+    /// Error Value
+    NotSelected,
 }
 
 #[derive(StructOpt, Clone, Debug)]
@@ -69,6 +71,16 @@ pub struct CliServiceFuture<F> {
 
 pub struct CliLayer;
 
+pub struct CliCommand<S> {
+    inner: S
+}
+
+#[pin_project]
+pub struct CliCommandFuture<F> {
+    #[pin]
+    future: F
+}
+
 pub struct HtmlOptsService;
 
 #[pin_project]
@@ -76,6 +88,8 @@ pub struct HtmlOptsServiceFuture<F> {
     #[pin]
     future: F,
 }
+
+pub struct CommandLayer;
 
 pub struct HtmlOptsLayer;
 
@@ -89,12 +103,10 @@ impl Cli {
     }
 
     /// Returns command selected by user via the cli
-    pub(crate) fn command(self) -> HtmlOpts {
+    pub(crate) fn command(self) -> CommandOpts {
         match self.cmd {
-            Some(cmd) => match cmd {
-                CommandOpts::Probe(opts) => opts,
-            },
-            None => HtmlOpts::NotSelected,
+            Some(cmd) => cmd,
+            None => CommandOpts::NotSelected,
         }
     }
 }
@@ -184,18 +196,23 @@ where
     }
 }
 
-// === impl HtmlOptsService ===
+// === impl CliCommand ===
 
-impl HtmlOptsService {
-    pub fn new() -> Self {
-        Self
+impl<S> CliCommand<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner }
     }
 }
 
-impl Service<Request<Cli>> for HtmlOptsService {
-    type Response = Response<HtmlOpts>;
-    type Error = Error;
-    type Future = future::Ready<Result<Self::Response, Self::Error>>;
+impl<S, B> Service<Request<Cli>> for CliCommand<S>
+    where
+        S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
+        S::Error: Debug + Display,
+        S::Future: 'static + Send,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = CliCommandFuture<S::Future>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -204,11 +221,83 @@ impl Service<Request<Cli>> for HtmlOptsService {
     fn call(&mut self, req: Request<Cli>) -> Self::Future {
         let cli = req.body().clone();
         let opts = cli.command();
-        future::ready(Ok(Response::new(opts)))
+        CliCommandFuture {
+            future: self.inner.call(Request::new(opts))
+        }
     }
 }
 
-// === impl HtmlOptsLayer ===
+impl<F, B, E> Future for CliCommandFuture<F>
+    where
+        F: Future<Output = Result<Response<B>, E>>,
+        E: Debug + Display,
+{
+    type Output = Result<Response<B>, E>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        event!(target: CLI, Level::TRACE, "polling cli command service(s)...");
+        let res: F::Output = match this.future.poll(cx) {
+            Poll::Ready(res) => res,
+            Poll::Pending => return Poll::Pending,
+        };
+
+        match &res {
+            Ok(_) => event!(target: CLI, Level::DEBUG, "cli command complete"),
+            Err(err) => event!(
+                target: CLI,
+                Level::ERROR,
+                "error processing cli service; {}",
+                err
+            ),
+        };
+        Poll::Ready(res)
+    }
+}
+
+impl CommandLayer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<S, B> Layer<S> for CommandLayer
+where
+    S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
+    S::Error: Debug + Display,
+    S::Future: 'static + Send,
+{
+    type Service = CliCommand<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        CliCommand::new(inner)
+    }
+}
+
+// === impl HtmlOpts ===
+
+impl HtmlOptsService {
+    pub fn new() -> Self { Self }
+}
+
+impl Service<Request<CommandOpts>> for HtmlOptsService {
+    type Response = Response<HtmlOpts>;
+    type Error = Error;
+    type Future = future::Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Request<CommandOpts>) -> Self::Future {
+        let opts = match req.body().clone() {
+            CommandOpts::Probe(opts) => opts,
+            _ => HtmlOpts::NotSelected
+        };
+        future::ready(Ok(Response::new(opts)))
+    }
+}
 
 impl HtmlOptsLayer {
     pub fn new() -> Self {
