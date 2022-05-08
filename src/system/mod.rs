@@ -43,6 +43,7 @@ impl<App> System<App> {
             let fut = app.call(request);
 
             let handle = tokio::spawn(async move {
+                event!(target: SYSTEM, Level::DEBUG, "processing request...");
                 match fut.await {
                     Ok(res) => event!(target: SYSTEM, Level::INFO, "{:?}", res),
                     Err(err) => event!(target: SYSTEM, Level::ERROR, "error: {}", err),
