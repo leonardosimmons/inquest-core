@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::error::Error;
 use crate::utils::Result;
 use std::future::Future;
@@ -36,8 +37,8 @@ impl<B> Request<B> {
         Self { body }
     }
 
-    pub fn body(&self) -> &B {
-        &self.body
+    pub fn into_body(self) -> B {
+        self.body
     }
 }
 
@@ -54,8 +55,8 @@ impl<B> Response<B> {
         Self { body }
     }
 
-    pub fn body(&self) -> &B {
-        &self.body
+    pub fn into_body(self) -> B {
+        self.body
     }
 }
 
