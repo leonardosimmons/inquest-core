@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use structopt::StructOpt;
-use tower::{Layer, Service};
+use tower::util::BoxService;
+use tower::{Layer, Service, ServiceBuilder};
 use tracing::{event, Level};
 
 #[derive(StructOpt, Clone, Debug)]
@@ -59,39 +60,39 @@ pub struct Cli {
     cmd: Option<CommandOpts>,
 }
 
-pub struct CliService<S> {
+struct CliService<S> {
     inner: S,
 }
 
 #[pin_project]
-pub struct CliServiceFuture<F> {
+struct CliServiceFuture<F> {
     #[pin]
     future: F,
 }
 
-pub struct CliLayer;
+struct CliLayer;
 
-pub struct CliCommand<S> {
-    inner: S
+struct CliCommand<S> {
+    inner: S,
 }
 
 #[pin_project]
-pub struct CliCommandFuture<F> {
-    #[pin]
-    future: F
-}
-
-pub struct HtmlOptsService;
-
-#[pin_project]
-pub struct HtmlOptsServiceFuture<F> {
+struct CliCommandFuture<F> {
     #[pin]
     future: F,
 }
 
-pub struct CommandLayer;
+struct HtmlOptsService;
 
-pub struct HtmlOptsLayer;
+#[pin_project]
+struct HtmlOptsServiceFuture<F> {
+    #[pin]
+    future: F,
+}
+
+struct CommandLayer;
+
+struct HtmlOptsLayer;
 
 // === impl Cli ===
 
@@ -108,6 +109,19 @@ impl Cli {
             Some(cmd) => cmd,
             None => CommandOpts::NotSelected,
         }
+    }
+
+    /// Root Cli Service
+    pub fn service() -> BoxService<Request<Cli>, Response<CommandOpts>, Error> {
+        let root = ServiceBuilder::new()
+            .layer(CliLayer::new())
+            .layer(CommandLayer::new())
+            .service_fn(|req: Request<CommandOpts>| async move {
+                let req = req.into_body();
+                let res = Response::new(req);
+                Ok::<_, Error>(res)
+            });
+        BoxService::new(root)
     }
 }
 
@@ -163,7 +177,7 @@ where
         };
 
         match &res {
-            Ok(_) => event!(target: CLI, Level::DEBUG, "cli service complete"),
+            Ok(_) => event!(target: CLI, Level::TRACE, "cli service complete"),
             Err(err) => event!(
                 target: CLI,
                 Level::ERROR,
@@ -174,8 +188,6 @@ where
         Poll::Ready(res)
     }
 }
-
-// === impl CliLayer ===
 
 impl CliLayer {
     pub fn new() -> Self {
@@ -205,10 +217,10 @@ impl<S> CliCommand<S> {
 }
 
 impl<S, B> Service<Request<Cli>> for CliCommand<S>
-    where
-        S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
-        S::Error: Debug + Display,
-        S::Future: 'static + Send,
+where
+    S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
+    S::Error: Debug + Display,
+    S::Future: 'static + Send,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -219,32 +231,36 @@ impl<S, B> Service<Request<Cli>> for CliCommand<S>
     }
 
     fn call(&mut self, req: Request<Cli>) -> Self::Future {
-        let cli = req.body().clone();
+        let cli = req.into_body();
         let opts = cli.command();
         CliCommandFuture {
-            future: self.inner.call(Request::new(opts))
+            future: self.inner.call(Request::new(opts)),
         }
     }
 }
 
 impl<F, B, E> Future for CliCommandFuture<F>
-    where
-        F: Future<Output = Result<Response<B>, E>>,
-        E: Debug + Display,
+where
+    F: Future<Output = Result<Response<B>, E>>,
+    E: Debug + Display,
 {
     type Output = Result<Response<B>, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        event!(target: CLI, Level::TRACE, "polling cli command service(s)...");
+        event!(
+            target: CLI,
+            Level::TRACE,
+            "polling cli command service(s)..."
+        );
         let res: F::Output = match this.future.poll(cx) {
             Poll::Ready(res) => res,
             Poll::Pending => return Poll::Pending,
         };
 
         match &res {
-            Ok(_) => event!(target: CLI, Level::DEBUG, "cli command complete"),
+            Ok(_) => event!(target: CLI, Level::TRACE, "cli command extracted"),
             Err(err) => event!(
                 target: CLI,
                 Level::ERROR,
@@ -278,7 +294,9 @@ where
 // === impl HtmlOpts ===
 
 impl HtmlOptsService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Service<Request<CommandOpts>> for HtmlOptsService {
@@ -291,9 +309,9 @@ impl Service<Request<CommandOpts>> for HtmlOptsService {
     }
 
     fn call(&mut self, req: Request<CommandOpts>) -> Self::Future {
-        let opts = match req.body().clone() {
+        let opts = match req.into_body() {
             CommandOpts::Probe(opts) => opts,
-            _ => HtmlOpts::NotSelected
+            _ => HtmlOpts::NotSelected,
         };
         future::ready(Ok(Response::new(opts)))
     }
