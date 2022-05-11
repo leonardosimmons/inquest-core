@@ -1,3 +1,4 @@
+#![allow(unused)]
 use inquest::cli::Cli;
 use inquest::system::System;
 use tracing::Level;
@@ -10,8 +11,8 @@ async fn main() {
         .compact()
         .init();
 
-    let cli = Cli::init();
-    let srv = Cli::service();
-
-    System::bind(srv).run(cli).await;
+    // let cli = Cli::init();
+    // let srv = Cli::service();
+    //
+    // System::bind(srv).run(cli).await;
 }

@@ -1,5 +1,6 @@
 #![allow(unused)]
 use crate::error::{Error, ErrorKind};
+use crate::logging::{JSON, REQUEST};
 use crate::parse::Parse;
 use crate::utils::Result;
 use atoi::atoi;
@@ -9,6 +10,7 @@ use std::fmt::{Display, Formatter};
 use std::io::Cursor;
 use std::str::FromStr;
 use std::vec;
+use tracing::{event, Level};
 
 pub(crate) trait ByteController {
     /// Returns first byte in the buffer
@@ -84,6 +86,33 @@ pub struct DataChunk {
     parts: vec::IntoIter<Data>,
 }
 
+/// JSON<Bytes>
+pub struct Json {
+    data: Bytes,
+}
+
+impl Json {
+    pub fn deserialize<'de, Res: Deserialize<'de>>(bytes: &'de Bytes) -> Res {
+        let bits = bytes.chunk(); // temp
+        serde_json::from_slice(bits).unwrap_or_else(|err| {
+            event!(target: JSON, Level::ERROR, "failed to deserialize bytes");
+            panic!("json deserialization failed; {}", err)
+        })
+    }
+
+    pub fn serialize<T: Serialize>(el: T) -> Bytes {
+        match serde_json::to_vec(&el) {
+            Ok(vec) => Bytes::from(vec),
+            Err(err) => {
+                event!(target: JSON, Level::ERROR, "failed to serialize element");
+                panic!("json serialization failed; {}", err)
+            }
+        }
+    }
+}
+
+// === impl Data ===
+
 impl From<Data> for DataChunk {
     fn from(data: Data) -> Self {
         match data {
@@ -101,6 +130,12 @@ impl From<Vec<Data>> for DataChunk {
         Self {
             parts: data.into_iter(),
         }
+    }
+}
+
+impl From<Bytes> for Json {
+    fn from(b: Bytes) -> Self {
+        Self { data: b }
     }
 }
 
@@ -165,6 +200,8 @@ impl DataController for Data {
         }
     }
 }
+
+// === impl std ===
 
 impl Display for Data {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {

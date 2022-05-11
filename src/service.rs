@@ -4,10 +4,6 @@ use crate::utils::Result;
 use std::future::Future;
 use std::task::{Context, Poll};
 
-const APP: &str = "app";
-const CLI: &str = "cli";
-const SYSTEM: &str = "system";
-
  pub trait IntoRequest<B> {
      fn into_request(self) -> Request<B>;
  }

@@ -1,8 +1,12 @@
+#![allow(unused)]
 use crate::cli::services::cli::CliLayer;
 use crate::cli::services::commands::CommandLayer;
 use crate::error::Error;
-use crate::logging::CLI;
+use crate::logging::{CLI, REQUEST, RESPONSE};
 use crate::service::{IntoRequest, IntoResponse, Request, Response};
+use bytes::Bytes;
+use hyper::Body;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -12,7 +16,7 @@ use tracing::{event, Level};
 
 pub mod services;
 
-#[derive(StructOpt, Clone, Debug)]
+#[derive(StructOpt, Clone, Debug, Deserialize, Serialize)]
 pub struct HtmlParseOpts {
     /// Filter based on HTML tag
     #[structopt(short, long)]
@@ -25,7 +29,7 @@ pub struct HtmlParseOpts {
     pub urls: Option<Vec<String>>,
 }
 
-#[derive(StructOpt, Clone, Debug)]
+#[derive(StructOpt, Clone, Debug, Deserialize, Serialize)]
 pub enum HtmlOpts {
     /// Returns the meta description
     #[structopt(name = "desc")]
@@ -43,7 +47,7 @@ pub enum HtmlOpts {
     NotSelected,
 }
 
-#[derive(StructOpt, Clone, Debug)]
+#[derive(StructOpt, Clone, Debug, Deserialize, Serialize)]
 pub enum CommandOpts {
     /// Probes specified Html document
     #[structopt(name = "probe")]
@@ -54,7 +58,7 @@ pub enum CommandOpts {
 
 // === Cli ===
 
-#[derive(StructOpt, Clone, Debug)]
+#[derive(StructOpt, Clone, Debug, Deserialize, Serialize)]
 pub struct Cli {
     /// System Command Options
     #[structopt(subcommand)]
@@ -78,30 +82,53 @@ impl Cli {
         }
     }
 
-    /// Root Cli Service
-    pub fn service() -> BoxService<Request<Cli>, Response<CommandOpts>, Error> {
-        let srv = ServiceBuilder::new()
-            .layer(CliLayer::new())
-            .layer(CommandLayer::new())
-            .service_fn(|req: Request<CommandOpts>| async move {
-                let req = req.into_body();
-                let res = Response::new(req);
-                Ok::<_, Error>(res)
-            });
-        BoxService::new(srv)
-    }
+    // pub fn service() -> BoxService<Request<Cli>, Response<CommandOpts>, Error> {
+    //     let srv = ServiceBuilder::new()
+    //         .layer(CliLayer::new())
+    //         .layer(CommandLayer::new())
+    //         .service_fn(|req: Request<CommandOpts>| async move {
+    //             let req = req.into_body();
+    //             let res = Response::new(req);
+    //             Ok::<_, Error>(res)
+    //         });
+    //     BoxService::new(srv)
+    // }
 }
 
-impl IntoRequest<Cli> for Cli {
-    fn into_request(self) -> Request<Cli> {
-        Request::new(self)
+impl IntoRequest<Bytes> for Cli {
+    fn into_request(self) -> Request<Bytes> {
+        let bytes = match serde_json::to_vec(&self) {
+            Ok(vec) => Bytes::from(vec),
+            Err(err) => {
+                event!(
+                    target: REQUEST,
+                    Level::ERROR,
+                    "failed to parse cli into request; {}",
+                    err
+                );
+                Bytes::default()
+            }
+        };
+        Request::new(bytes)
     }
 }
 
 // === impl CommandOpts ===
 
-impl IntoResponse<CommandOpts> for CommandOpts {
-    fn into_response(self) -> Response<CommandOpts> {
-        Response::new(self)
+impl IntoResponse<Bytes> for CommandOpts {
+    fn into_response(self) -> Response<Bytes> {
+        let bytes = match serde_json::to_vec(&self) {
+            Ok(vec) => Bytes::from(vec),
+            Err(err) => {
+                event!(
+                    target: RESPONSE,
+                    Level::ERROR,
+                    "failed to parse cli into response; {}",
+                    err
+                );
+                Bytes::default()
+            }
+        };
+        Response::new(bytes)
     }
 }

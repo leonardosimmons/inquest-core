@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use hyper::{Method, Request, Response};
 use pin_project::pin_project;
 use std::fmt::Debug;
@@ -8,13 +6,16 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::Instant;
 use tower::{Layer, Service};
-use tracing::{debug, error, event, trace, Level};
+use tracing::{event, Level};
 
-pub const APP: &str = "app";
-pub const CLI: &str = "cli";
-pub const LOGGER: &str = "logger";
-pub const LOGGING_FUTURE: &str = "logging_future";
-pub const SYSTEM: &str = "system";
+pub(crate) const APP: &str = "app";
+pub(crate) const CLI: &str = "cli";
+pub(crate) const JSON: &str = "json";
+pub(crate) const LOGGER: &str = "logger";
+pub(crate) const LOGGING_FUTURE: &str = "logging_future";
+pub(crate) const REQUEST: &str = "request";
+pub(crate) const RESPONSE: &str = "response";
+pub(crate) const SYSTEM: &str = "system";
 
 #[derive(Copy, Clone, Debug)]
 pub struct Logging<S> {
@@ -42,8 +43,6 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let method = Method::from(req.method());
-        let path = req.uri().path().to_string();
         let start = Instant::now();
         event!(
             target: LOGGER,
@@ -86,7 +85,7 @@ where
         };
         let duration = this.start.elapsed();
         match &res {
-            Ok(res) => event!(
+            Ok(_res) => event!(
                 target: LOGGING_FUTURE,
                 Level::DEBUG,
                 "finished processing request; time elapsed={:?}",

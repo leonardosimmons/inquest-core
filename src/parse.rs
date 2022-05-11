@@ -1,12 +1,9 @@
-#![allow(unused)]
-use async_trait::async_trait;
-use select::predicate::{Name, Predicate};
-use std::path::PathBuf;
-use bytes::Bytes;
-use crate::data::{ByteController, Data, DataChunk, DataController, DataParser};
 use crate::error::{Error, ErrorKind};
 use crate::html::{Headers, HtmlAttribute, HtmlDocument, HtmlParser, HtmlTag};
 use crate::utils::Result;
+use async_trait::async_trait;
+use select::predicate::{Name, Predicate};
+use std::path::PathBuf;
 
 #[async_trait]
 pub trait FromPath
