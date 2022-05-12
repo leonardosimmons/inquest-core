@@ -1,4 +1,4 @@
-use hyper::{Method, Request, Response};
+use hyper::{Request, Response};
 use pin_project::pin_project;
 use std::fmt::Debug;
 use std::future::Future;
