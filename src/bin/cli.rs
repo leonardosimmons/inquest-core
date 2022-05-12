@@ -3,6 +3,7 @@ use inquest::cli::Cli;
 use inquest::system::System;
 use tracing::Level;
 use tracing_subscriber;
+use inquest::data::Json;
 
 #[tokio::main]
 async fn main() {
@@ -11,8 +12,10 @@ async fn main() {
         .compact()
         .init();
 
-    // let cli = Cli::init();
-    // let srv = Cli::service();
-    //
-    // System::bind(srv).run(cli).await;
+    let cli = Cli::init();
+    let srv = Cli::service();
+
+    let json = Json::new(cli);
+
+    System::bind(srv).run(json).await;
 }

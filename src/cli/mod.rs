@@ -13,6 +13,7 @@ use structopt::StructOpt;
 use tower::util::BoxService;
 use tower::ServiceBuilder;
 use tracing::{event, Level};
+use crate::data::Json;
 
 pub mod services;
 
@@ -82,17 +83,17 @@ impl Cli {
         }
     }
 
-    // pub fn service() -> BoxService<Request<Cli>, Response<CommandOpts>, Error> {
-    //     let srv = ServiceBuilder::new()
-    //         .layer(CliLayer::new())
-    //         .layer(CommandLayer::new())
-    //         .service_fn(|req: Request<CommandOpts>| async move {
-    //             let req = req.into_body();
-    //             let res = Response::new(req);
-    //             Ok::<_, Error>(res)
-    //         });
-    //     BoxService::new(srv)
-    // }
+    pub fn service() -> BoxService<Request<Json>, Response<Json>, Error> {
+        let srv = ServiceBuilder::new()
+            .layer(CliLayer::new())
+            .layer(CommandLayer::new())
+            .service_fn(|req: Request<Json>| async move {
+                let json = req.into_body();
+                let res = Response::new(json);
+                Ok::<_, Error>(res)
+            });
+        BoxService::new(srv)
+    }
 }
 
 impl IntoRequest<Bytes> for Cli {

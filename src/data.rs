@@ -88,6 +88,7 @@ pub struct DataChunk {
     parts: vec::IntoIter<Data>,
 }
 
+#[derive(Debug)]
 pub struct Json {
     data: Bytes,
 }

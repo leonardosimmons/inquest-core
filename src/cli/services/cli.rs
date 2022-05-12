@@ -7,6 +7,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 use tracing::{event, Level};
+use crate::data::Json;
 use crate::logging::CLI;
 
 pub(crate) struct CliService<S> {
@@ -23,9 +24,9 @@ pub(crate) struct CliLayer;
 
 // === Service ===
 
-impl<S, B> CliService<S>
+impl<S> CliService<S>
     where
-        S: Service<Request<Cli>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<Json>, Response = Response<Json>> + Send + 'static,
         S::Error: Debug + Display,
         S::Future: 'static + Send,
 {
@@ -34,9 +35,9 @@ impl<S, B> CliService<S>
     }
 }
 
-impl<S, B> Service<Request<Cli>> for CliService<S>
+impl<S> Service<Request<Json>> for CliService<S>
     where
-        S: Service<Request<Cli>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<Json>, Response = Response<Json>> + Send + 'static,
         S::Error: Debug + Display,
         S::Future: 'static + Send,
 {
@@ -49,7 +50,7 @@ impl<S, B> Service<Request<Cli>> for CliService<S>
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Request<Cli>) -> Self::Future {
+    fn call(&mut self, req: Request<Json>) -> Self::Future {
         CliServiceFuture {
             future: self.inner.call(req),
         }
@@ -58,12 +59,12 @@ impl<S, B> Service<Request<Cli>> for CliService<S>
 
 // === Future ===
 
-impl<F, B, E> Future for CliServiceFuture<F>
+impl<F, E> Future for CliServiceFuture<F>
     where
-        F: Future<Output = Result<Response<B>, E>>,
+        F: Future<Output = Result<Response<Json>, E>>,
         E: Debug + Display,
 {
-    type Output = Result<Response<B>, E>;
+    type Output = Result<Response<Json>, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -95,9 +96,9 @@ impl CliLayer {
     }
 }
 
-impl<S, B> Layer<S> for CliLayer
+impl<S> Layer<S> for CliLayer
     where
-        S: Service<Request<Cli>, Response = Response<B>> + Send + 'static,
+        S: Service<Request<Json>, Response = Response<Json>> + Send + 'static,
         S::Error: Debug + Display,
         S::Future: Send + 'static,
 {

@@ -7,6 +7,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 use tracing::{event, Level};
+use crate::data::Json;
 use crate::logging::CLI;
 
 pub(crate) struct CommandOptsService<S> {
@@ -29,9 +30,9 @@ impl<S> CommandOptsService<S> {
     }
 }
 
-impl<S, B> Service<Request<Cli>> for CommandOptsService<S>
+impl<S> Service<Request<Json>> for CommandOptsService<S>
 where
-    S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
+    S: Service<Request<Json>, Response = Response<Json>> + Send + 'static,
     S::Error: Debug + Display,
     S::Future: 'static + Send,
 {
@@ -43,23 +44,25 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Request<Cli>) -> Self::Future {
-        let cli = req.into_body();
+    fn call(&mut self, req: Request<Json>) -> Self::Future {
+        let cli: Cli = Json::deserialize(&req.into_body().bytes());
         let opts = cli.command();
+        // TODO: utilize tower::steer to match between command options
+        let json = Json::new(opts);
         CommandOptsFuture {
-            future: self.inner.call(Request::new(opts)),
+            future: self.inner.call(Request::new(json)),
         }
     }
 }
 
 // === Future ===
 
-impl<F, B, E> Future for CommandOptsFuture<F>
+impl<F, E> Future for CommandOptsFuture<F>
 where
-    F: Future<Output = Result<Response<B>, E>>,
+    F: Future<Output = Result<Response<Json>, E>>,
     E: Debug + Display,
 {
-    type Output = Result<Response<B>, E>;
+    type Output = Result<Response<Json>, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
@@ -95,9 +98,9 @@ impl CommandLayer {
     }
 }
 
-impl<S, B> Layer<S> for CommandLayer
+impl<S> Layer<S> for CommandLayer
 where
-    S: Service<Request<CommandOpts>, Response = Response<B>> + Send + 'static,
+    S: Service<Request<Json>, Response = Response<Json>> + Send + 'static,
     S::Error: Debug + Display,
     S::Future: 'static + Send,
 {
