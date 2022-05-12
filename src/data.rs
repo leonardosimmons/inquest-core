@@ -2,6 +2,7 @@
 use crate::error::{Error, ErrorKind};
 use crate::logging::{JSON, REQUEST};
 use crate::parse::Parse;
+use crate::service::{IntoRequest, IntoResponse, Request, Response};
 use crate::utils::Result;
 use atoi::atoi;
 use bytes::{Buf, Bytes};
@@ -77,6 +78,7 @@ pub enum Data {
     Bulk(Bytes),
     Error(String),
     Integer(u64),
+    Json(Json),
     Null,
     Simple(String),
 }
@@ -86,58 +88,11 @@ pub struct DataChunk {
     parts: vec::IntoIter<Data>,
 }
 
-/// JSON<Bytes>
 pub struct Json {
     data: Bytes,
 }
 
-impl Json {
-    pub fn deserialize<'de, Res: Deserialize<'de>>(bytes: &'de Bytes) -> Res {
-        let bits = bytes.chunk(); // temp
-        serde_json::from_slice(bits).unwrap_or_else(|err| {
-            event!(target: JSON, Level::ERROR, "failed to deserialize bytes");
-            panic!("json deserialization failed; {}", err)
-        })
-    }
-
-    pub fn serialize<T: Serialize>(el: T) -> Bytes {
-        match serde_json::to_vec(&el) {
-            Ok(vec) => Bytes::from(vec),
-            Err(err) => {
-                event!(target: JSON, Level::ERROR, "failed to serialize element");
-                panic!("json serialization failed; {}", err)
-            }
-        }
-    }
-}
-
 // === impl Data ===
-
-impl From<Data> for DataChunk {
-    fn from(data: Data) -> Self {
-        match data {
-            Data::Array(d) => d.into(),
-            data => panic!(
-                "protocol error; expecting a `Data::Array`, instead got {}",
-                data
-            ),
-        }
-    }
-}
-
-impl From<Vec<Data>> for DataChunk {
-    fn from(data: Vec<Data>) -> Self {
-        Self {
-            parts: data.into_iter(),
-        }
-    }
-}
-
-impl From<Bytes> for Json {
-    fn from(b: Bytes) -> Self {
-        Self { data: b }
-    }
-}
 
 impl ByteController for Data {
     fn peek_byte(src: &mut Cursor<&[u8]>) -> Result<u8> {
@@ -201,7 +156,58 @@ impl DataController for Data {
     }
 }
 
+// === impl JSON ===
+
+impl Json {
+    pub fn new<El: Serialize>(elem: El) -> Json {
+        Json {
+            data: Json::serialize(elem),
+        }
+    }
+
+    pub fn bytes(&self) -> Bytes {
+        self.data.clone()
+    }
+
+    pub fn into_bytes(self) -> Bytes {
+        self.data
+    }
+
+    pub fn data<'de, Res: Deserialize<'de>>(&'de self) -> Res {
+        Json::deserialize(&self.data)
+    }
+
+    pub fn set<El: Serialize>(&mut self, elem: El) {
+        self.data = Json::serialize(elem);
+    }
+
+    pub fn deserialize<'de, Res: Deserialize<'de>>(bytes: &'de Bytes) -> Res {
+        serde_json::from_slice(bytes.chunk()).unwrap_or_else(|err| {
+            event!(target: JSON, Level::ERROR, "failed to deserialize bytes");
+            panic!("json deserialization failed; {}", err);
+        })
+    }
+
+    pub fn serialize<T: Serialize>(elem: T) -> Bytes {
+        match serde_json::to_vec(&elem) {
+            Ok(vec) => Bytes::from(vec),
+            Err(err) => {
+                event!(target: JSON, Level::ERROR, "failed to serialize element");
+                panic!("json serialization failed; {}", err);
+            }
+        }
+    }
+}
+
 // === impl std ===
+
+impl Default for Json {
+    fn default() -> Self {
+        Json {
+            data: Bytes::default()
+        }
+    }
+}
 
 impl Display for Data {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
@@ -212,8 +218,12 @@ impl Display for Data {
             Data::Error(msg) => write!(fmt, "error: {}", msg),
             Data::Integer(num) => num.fmt(fmt),
             Data::Bulk(msg) => match str::from_utf8(msg) {
-                Ok(string) => string.fmt(fmt),
+                Ok(s) => s.fmt(fmt),
                 Err(_) => write!(fmt, "{:?}", msg),
+            },
+            Data::Json(json) => match str::from_utf8(&json.bytes()) {
+                Ok(s) => s.fmt(fmt),
+                Err(_) => write!(fmt, "{:?}", json.bytes()),
             },
             Data::Null => "(nil)".fmt(fmt),
             Data::Array(parts) => {
@@ -223,7 +233,6 @@ impl Display for Data {
                         part.fmt(fmt)?;
                     }
                 }
-
                 Ok(())
             }
         }
@@ -249,6 +258,49 @@ impl Display for Origin {
     }
 }
 
+impl From<Data> for DataChunk {
+    fn from(data: Data) -> Self {
+        match data {
+            Data::Array(d) => d.into(),
+            data => panic!(
+                "protocol error; expecting a `Data::Array`, instead got {}",
+                data
+            ),
+        }
+    }
+}
+
+impl From<Vec<Data>> for DataChunk {
+    fn from(data: Vec<Data>) -> Self {
+        Self {
+            parts: data.into_iter(),
+        }
+    }
+}
+
+impl From<Bytes> for Json {
+    fn from(bytes: Bytes) -> Self {
+        Self {
+            data: Json::serialize(bytes),
+        }
+    }
+}
+
+impl From<Vec<u8>> for Json {
+    fn from(vec: Vec<u8>) -> Self {
+        let b = Bytes::from(vec);
+        Self {
+            data: Json::serialize(b),
+        }
+    }
+}
+
+impl From<&[u8]> for Json {
+    fn from(bits: &[u8]) -> Self {
+        Json::from(bits.to_vec())
+    }
+}
+
 impl FromStr for Origin {
     type Err = Error;
 
@@ -262,11 +314,24 @@ impl FromStr for Origin {
     }
 }
 
+impl IntoRequest<Json> for Json {
+    fn into_request(self) -> Request<Json> {
+        Request::new(self)
+    }
+}
+
+impl IntoResponse<Json> for Json {
+    fn into_response(self) -> Response<Json> {
+        Response::new(self)
+    }
+}
+
 impl PartialEq<&str> for Data {
     fn eq(&self, other: &&str) -> bool {
         match self {
             Data::Simple(s) => s.eq(other),
-            Data::Bulk(s) => s.eq(other),
+            Data::Bulk(b) => b.eq(other),
+            Data::Json(j) => j.bytes().eq(other),
             _ => false,
         }
     }
