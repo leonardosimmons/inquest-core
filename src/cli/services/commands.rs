@@ -45,12 +45,16 @@ where
     }
 
     fn call(&mut self, req: Request<Json>) -> Self::Future {
-        let cli: Cli = Json::deserialize(&req.into_body().bytes());
+        let cli: Cli = req.into_body().data();
         let opts = cli.command();
-        // TODO: utilize tower::steer to match between command options
-        let json = Json::new(opts);
-        CommandOptsFuture {
-            future: self.inner.call(Request::new(json)),
+        match opts {
+            CommandOpts::Probe(opts) => {
+                let json = Json::new(opts);
+                CommandOptsFuture {
+                    future: self.inner.call(Request::new(json)),
+                }
+            }
+            _ => panic!("unimplemented")
         }
     }
 }

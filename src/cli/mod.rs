@@ -13,6 +13,7 @@ use structopt::StructOpt;
 use tower::util::BoxService;
 use tower::ServiceBuilder;
 use tracing::{event, Level};
+use crate::cli::services::html::HtmlOptsLayer;
 use crate::data::Json;
 
 pub mod services;
@@ -87,6 +88,7 @@ impl Cli {
         let srv = ServiceBuilder::new()
             .layer(CliLayer::new())
             .layer(CommandLayer::new())
+            .layer(HtmlOptsLayer::new())
             .service_fn(|req: Request<Json>| async move {
                 let json = req.into_body();
                 let res = Response::new(json);
