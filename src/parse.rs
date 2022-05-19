@@ -1,130 +1,33 @@
-#![allow(unused)]
-use std::str;
-
-use bytes::Bytes;
-use select::document::Document;
-use select::predicate::{Name, Predicate};
-
 use crate::error::{Error, ErrorKind};
-use crate::html::{Headers, Html, HtmlTag};
+use crate::html::{Headers, HtmlAttribute, HtmlDocument, HtmlParser, HtmlTag};
 use crate::utils::Result;
+use async_trait::async_trait;
+use select::predicate::{Name, Predicate};
+use std::path::PathBuf;
 
-pub struct Parse<T> {
-    parse: T,
+#[async_trait]
+pub trait FromPath
+where
+    Self: Sized,
+{
+    async fn from(&mut self, path: &str, capacity: usize) -> Result<Self>;
 }
 
-impl<T> Parse<T> {
-    pub fn new(kind: T) -> Parse<T> {
-        Parse { parse: kind }
-    }
+#[async_trait]
+pub trait FromUrl
+where
+    Self: Sized,
+{
+    async fn from(&mut self, url: &str) -> Result<Self>;
 }
 
-impl Parse<Html> {
-    pub fn from(document: String) -> Parse<Html> {
-        Parse {
-            parse: Html::new(document),
-        }
-    }
+pub trait Parser {}
 
-    pub async fn from_url(html: &str) -> Result<Parse<Html>> {
-        Ok(Parse::new(Html::from_url(html).await?))
-    }
+pub struct Default;
 
-    pub(crate) fn bytes(&self) -> Bytes {
-        self.parse.html.lock().unwrap().clone()
-    }
-
-    pub(crate) async fn document(&self) -> Result<Document> {
-        if let Ok(doc) = Document::from_read(&*self.parse.html.lock().unwrap().clone()) {
-            Ok(doc)
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-
-    pub(crate) fn text(&self) -> Result<String> {
-        if let Ok(text) = str::from_utf8(&*self.parse.html.lock().unwrap().clone()) {
-            Ok(text.to_owned())
-        } else {
-            Err(Error::from(ErrorKind::Html))
-        }
-    }
-
-    pub(crate) async fn all_headers(&self) -> Result<Vec<Headers>> {
-        use HtmlTag::*;
-
-        let mut buff: Vec<_> = vec![];
-        for i in 1..=6 {
-            match i {
-                1 => buff.push(self.header(H1).await?),
-                2 => buff.push(self.header(H2).await?),
-                3 => buff.push(self.header(H3).await?),
-                4 => buff.push(self.header(H4).await?),
-                5 => buff.push(self.header(H5).await?),
-                6 => buff.push(self.header(H6).await?),
-                _ => {}
-            }
-        }
-        Ok(buff)
-    }
-
-    pub(crate) async fn all_links(&self) -> Result<Vec<String>> {
-        self.parse.links(Name("a"))
-    }
-
-    pub(crate) async fn header(&self, header: HtmlTag) -> Result<Headers> {
-        match self.document().await {
-            _doc => match header {
-                HtmlTag::H1 => Ok(Parse::headers_from_tag(
-                    1,
-                    self.parse
-                        .headers(&format!("h{}", 1))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-                HtmlTag::H2 => Ok(Parse::headers_from_tag(
-                    2,
-                    self.parse
-                        .headers(&format!("h{}", 2))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-                HtmlTag::H3 => Ok(Parse::headers_from_tag(
-                    3,
-                    self.parse
-                        .headers(&format!("h{}", 3))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-                HtmlTag::H4 => Ok(Parse::headers_from_tag(
-                    4,
-                    self.parse
-                        .headers(&format!("h{}", 4))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-                HtmlTag::H5 => Ok(Parse::headers_from_tag(
-                    5,
-                    self.parse
-                        .headers(&format!("h{}", 5))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-                HtmlTag::H6 => Ok(Parse::headers_from_tag(
-                    6,
-                    self.parse
-                        .headers(&format!("h{}", 6))
-                        .unwrap_or_else(|_| Vec::new()),
-                )),
-            },
-        }
-    }
-
-    pub(crate) async fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
-        self.parse.links(predicate)
-    }
-
-    pub(crate) async fn page_title(&self) -> Result<Vec<String>> {
-        self.parse.title()
-    }
-
-    /// Trims `https://` from the start and `/` from the end of the link (if applicable)
-    pub(crate) fn fix_link(link: &str) -> &str {
+pub struct Utils;
+impl Utils {
+    fn fix_link(link: &str) -> &str {
         link.trim_start_matches("https")
             .trim_start_matches("http")
             .trim_start_matches(":")
@@ -132,29 +35,151 @@ impl Parse<Html> {
             .trim_end_matches('/')
     }
 
-    pub(crate) fn headers(headers: &Headers) -> Vec<String> {
-        let mut buff = vec![];
-        match headers {
-            Headers::H1(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            Headers::H2(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            Headers::H3(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            Headers::H4(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            Headers::H5(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            Headers::H6(heads) => heads.iter().for_each(|h| buff.push(h.clone())),
-            _ => {}
-        }
-        buff
+    fn path_to_string(path: PathBuf) -> String {
+        path.to_str().unwrap_or_default().to_string()
+    }
+}
+
+pub struct Parse<T> {
+    parse: T,
+}
+
+impl<T> Parse<T> {
+    pub fn default() -> Parse<Default> {
+        Parse { parse: Default }
     }
 
-    fn headers_from_tag(index: u8, headers: Vec<String>) -> Headers {
-        match index {
-            1 => Headers::H1(headers),
-            2 => Headers::H2(headers),
-            3 => Headers::H3(headers),
-            4 => Headers::H4(headers),
-            5 => Headers::H5(headers),
-            6 => Headers::H6(headers),
-            _ => Headers::Invalid,
+    pub fn new(kind: T) -> Parse<T> {
+        Parse { parse: kind }
+    }
+}
+
+impl<T> Parser for Parse<T> {}
+
+#[async_trait]
+impl<T> FromPath for Parse<T>
+where
+    T: FromPath + Send,
+{
+    async fn from(&mut self, path: &str, capacity: usize) -> Result<Self> {
+        Ok(Self {
+            parse: self.parse.from(path, capacity).await?,
+        })
+    }
+}
+
+#[async_trait]
+impl<T> FromUrl for Parse<T>
+where
+    T: FromUrl + Send,
+{
+    async fn from(&mut self, url: &str) -> Result<Self> {
+        Ok(Self {
+            parse: self.parse.from(url).await?,
+        })
+    }
+}
+
+impl<T> Parse<T>
+where
+    T: HtmlDocument,
+{
+    pub fn all_headers(&self, mut buff: Vec<Headers>) -> Result<Vec<Headers>> {
+        let mut count = 1;
+        loop {
+            match count {
+                1 => buff.push(self.header(HtmlTag::H1)?),
+                2 => buff.push(self.header(HtmlTag::H2)?),
+                3 => buff.push(self.header(HtmlTag::H3)?),
+                4 => buff.push(self.header(HtmlTag::H4)?),
+                5 => buff.push(self.header(HtmlTag::H5)?),
+                6 => buff.push(self.header(HtmlTag::H6)?),
+                _ => break,
+            };
+            count = count + 1;
         }
+        Ok(buff)
+    }
+
+    pub fn all_links(&self) -> Result<Vec<String>> {
+        self.links(Name(HtmlAttribute::A.into()))
+    }
+}
+
+impl<T> HtmlParser for Parse<T>
+where
+    T: HtmlDocument,
+{
+    fn descriptions(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc
+                .find(Name(HtmlTag::Meta.into()))
+                .filter_map(|n| match n.attr(HtmlAttribute::Name.into()) {
+                    Some(name) => {
+                        if name.contains("description") {
+                            Some(n.attr(HtmlAttribute::Content.into()).unwrap())
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                })
+                .map(|c| c.to_string())
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Document))
+        }
+    }
+
+    fn header(&self, header: HtmlTag) -> Result<Headers> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(Headers::new(
+                doc.find(Name(&header.to_string()[..]))
+                    .filter_map(|n| Some(n.text()))
+                    .collect(),
+                header.into(),
+            ))
+        } else {
+            Err(Error::from(ErrorKind::Document))
+        }
+    }
+
+    fn links<P: Predicate>(&self, predicate: P) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc
+                .find(predicate)
+                .filter_map(|n| {
+                    if let Some(link) = n.attr(HtmlAttribute::Href.into()) {
+                        Some(Parse::<Utils>::fix_link(link))
+                    } else {
+                        None
+                    }
+                })
+                .map(|x| x.to_string())
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Document))
+        }
+    }
+
+    fn page_title(&self) -> Result<Vec<String>> {
+        if let Ok(doc) = self.parse.document() {
+            Ok(doc
+                .find(Name(HtmlTag::Title.into()))
+                .map(|t| t.text())
+                .collect())
+        } else {
+            Err(Error::from(ErrorKind::Document))
+        }
+    }
+}
+
+impl Parse<Utils> {
+    pub fn fix_link(link: &str) -> &str {
+        Utils::fix_link(link)
+    }
+
+    pub fn path_to_string(path: PathBuf) -> String {
+        Utils::path_to_string(path)
     }
 }
